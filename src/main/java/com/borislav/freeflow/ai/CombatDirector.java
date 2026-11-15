@@ -4,12 +4,14 @@ import com.borislav.freeflow.combat.CombatModeTracker;
 import com.borislav.freeflow.combat.CombatState;
 import com.borislav.freeflow.combat.CombatStateManager;
 import com.borislav.freeflow.config.FreeflowConfig;
+import com.borislav.freeflow.mixin.CreeperAccessor;
 import com.borislav.freeflow.network.TelegraphPayload;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.monster.Creeper;
 import net.minecraft.world.entity.monster.RangedAttackMob;
 
 import java.util.Iterator;
@@ -56,7 +58,7 @@ public final class CombatDirector {
 	private static int active(CombatState state, boolean ranged) {
 		int n = 0;
 		for (EnemySlot s : state.enemies.values()) {
-			if (s.isTelegraphing() && s.ranged == ranged) {
+			if (s.isTelegraphing() && s.ranged == ranged && !s.creeper) {
 				n++;
 			}
 		}
@@ -134,6 +136,7 @@ public final class CombatDirector {
 	/** Resolves due attacks and forgets dead/invalid enemies. */
 	public static void tick(ServerPlayer player, CombatState state) {
 		long now = player.level().getGameTime();
+		watchCreepers(player, state, now);
 		Iterator<EnemySlot> it = state.enemies.values().iterator();
 		while (it.hasNext()) {
 			EnemySlot slot = it.next();
@@ -148,7 +151,9 @@ public final class CombatDirector {
 			if (slot.isTelegraphing() && now >= slot.attackAt) {
 				slot.attackAt = -1;
 				sendTelegraph(player, mob, 0, 0);
-				if (slot.ranged) {
+				if (slot.creeper) {
+					slot.creeper = false; // the creeper explodes by itself
+				} else if (slot.ranged) {
 					slot.nextAllowed = now + Mth.nextInt(mob.getRandom(),
 							FreeflowConfig.rangedCooldownMin, FreeflowConfig.rangedCooldownMax);
 					shoot(player, mob);
@@ -157,6 +162,31 @@ public final class CombatDirector {
 							FreeflowConfig.enemyAttackCooldownMin, FreeflowConfig.enemyAttackCooldownMax);
 					strike(player, mob);
 				}
+			}
+		}
+	}
+
+	/**
+	 * Creepers don't take turns, they explode. When one near the player starts its fuse, the
+	 * fuse becomes an orange telegraph (counter = kick it away); if the fuse stops, so does it.
+	 */
+	private static void watchCreepers(ServerPlayer player, CombatState state, long now) {
+		for (Creeper creeper : player.level().getEntitiesOfClass(Creeper.class, player.getBoundingBox().inflate(8.0),
+				c -> c.isAlive() && c.getTarget() == player)) {
+			EnemySlot slot = slot(state, creeper);
+			CreeperAccessor fuse = (CreeperAccessor) creeper;
+			if (creeper.getSwellDir() > 0 && !slot.isTelegraphing()) {
+				int left = Math.max(1, fuse.freeflow$getMaxSwell() - fuse.freeflow$getSwell());
+				slot.creeper = true;
+				slot.ranged = false;
+				slot.kind = TelegraphPayload.CREEPER;
+				slot.attackAt = now + left;
+				sendTelegraph(player, creeper, left, TelegraphPayload.CREEPER);
+				MobReaction.send(creeper, MobReaction.WINDUP, left, TelegraphPayload.CREEPER, player);
+			} else if (creeper.getSwellDir() <= 0 && slot.isTelegraphing() && slot.creeper) {
+				slot.attackAt = -1;
+				slot.creeper = false;
+				sendTelegraph(player, creeper, 0, 0);
 			}
 		}
 	}

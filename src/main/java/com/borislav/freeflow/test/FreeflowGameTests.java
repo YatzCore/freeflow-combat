@@ -941,6 +941,62 @@ public class FreeflowGameTests implements FabricGameTest {
 		});
 	}
 
+	// --- Creepers, slimes, loot ---
+
+	@GameTest(template = EMPTY_STRUCTURE, timeoutTicks = 80)
+	public void creeperFuseIsTelegraphedAndKickedAway(GameTestHelper h) {
+		ServerPlayer p = player(h, CombatMode.FORCED_ON);
+		net.minecraft.world.entity.monster.Creeper creeper = still(h.spawn(EntityType.CREEPER, 2.5f, 1, 4.0f), 180.0f);
+		creeper.setTarget(p);
+		creeper.setSwellDir(1); // fuse lit
+		CombatState state = CombatStateManager.get(p);
+
+		h.runAfterDelay(3, () -> {
+			EnemySlot slot = state.enemies.get(creeper.getId());
+			h.assertTrue(slot != null && slot.isTelegraphing() && slot.creeper, "a lit creeper fuse should be telegraphed");
+			h.assertTrue(slot.kind == TelegraphPayload.CREEPER, "creeper telegraph kind");
+			counter(p);
+			h.assertTrue(!slot.isTelegraphing(), "the counter should deal with the creeper");
+			h.assertTrue(creeper.getSwellDir() < 0, "the kick should stamp out the fuse");
+			h.assertTrue(((com.borislav.freeflow.mixin.CreeperAccessor) creeper).freeflow$getSwell() == 0, "fuse reset");
+			h.runAfterDelay(40, () -> {
+				h.assertTrue(creeper.isAlive() || !creeper.isRemoved(), "the creeper must not have exploded");
+				h.assertTrue(p.isAlive(), "player survives");
+				h.succeed();
+			});
+		});
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE)
+	public void slimesTakeTurns(GameTestHelper h) {
+		ServerPlayer p = player(h, CombatMode.FORCED_ON);
+		net.minecraft.world.entity.monster.Slime slime = h.spawn(EntityType.SLIME, 2.5f, 1, 3.5f);
+		slime.setSize(2, true);
+		CombatState state = CombatStateManager.get(p);
+
+		slime.playerTouch(p); // touching would normally hurt instantly
+		EnemySlot slot = state.enemies.get(slime.getId());
+		h.assertTrue(slot != null && slot.isTelegraphing(), "a slime's touch should become a telegraphed turn");
+		h.succeed();
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE)
+	public void pickupsKeepTheFistSlotEmpty(GameTestHelper h) {
+		ServerPlayer p = player(h, CombatMode.FORCED_ON);
+		var inv = p.getInventory();
+		inv.selected = 0;
+		inv.add(new ItemStack(Items.DIRT));
+		h.assertTrue(inv.getItem(0).isEmpty(), "freeflow: the fist slot must stay empty");
+		h.assertTrue(inv.getItem(1).is(Items.DIRT), "freeflow: the pickup goes to the next free slot");
+
+		CombatState state = CombatStateManager.get(p);
+		state.mode = CombatMode.OFF;
+		CombatModeTracker.tick(p, state);
+		inv.add(new ItemStack(Items.STONE));
+		h.assertTrue(inv.getItem(0).is(Items.STONE), "outside freeflow pickups behave like vanilla");
+		h.succeed();
+	}
+
 	private static void counter(ServerPlayer p) {
 		CombatStateManager.handleInput(p, new CombatInputPayload(CombatAction.COUNTER, 0, 0, FACING_PLUS_Z));
 	}

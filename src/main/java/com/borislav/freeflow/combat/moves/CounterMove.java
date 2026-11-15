@@ -21,6 +21,8 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.monster.Creeper;
+import com.borislav.freeflow.mixin.CreeperAccessor;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.List;
@@ -128,8 +130,39 @@ public class CounterMove implements Move {
 		return Math.floorMod(state.counterIndex++, 3);
 	}
 
+	/** Creeper counter: kick it away and stamp out its fuse. */
+	private static void kickCreeper(ServerPlayer player, CombatState state, EnemySlot slot, Creeper creeper, long now) {
+		slot.attackAt = -1;
+		slot.creeper = false;
+		CombatDirector.sendTelegraph(player, creeper, 0);
+		creeper.setSwellDir(-1);
+		((CreeperAccessor) creeper).freeflow$setSwell(0);
+		((CreeperAccessor) creeper).freeflow$setOldSwell(0);
+
+		creeper.invulnerableTime = 0;
+		creeper.hurt(player.damageSources().playerAttack(player), FreeflowConfig.counterDamage);
+		creeper.knockback(FreeflowConfig.creeperKickKnockback, player.getX() - creeper.getX(), player.getZ() - creeper.getZ());
+		Vec3 v = creeper.getDeltaMovement();
+		creeper.setDeltaMovement(v.x, Math.max(v.y, FreeflowConfig.heavyLift), v.z);
+		creeper.hurtMarked = true;
+		EnemyStatus.stun(player, state, creeper, FreeflowConfig.counterStunTicks);
+		slot.nextAllowed = now + FreeflowConfig.counterStunTicks + FreeflowConfig.enemyAttackCooldownMin;
+
+		state.lastCounterVariant = MobReaction.COUNTER_KICK;
+		state.fight.record(FightStats.MoveType.COUNTER_KICK);
+		ComboTracker.onHit(player, state);
+		Anim.play(player, Anim.COUNTER_KICK);
+		MobReaction.send(creeper, creeper.isAlive() ? MobReaction.COUNTERED : MobReaction.KNOCKED_OUT,
+				FreeflowConfig.counterStunTicks, MobReaction.COUNTER_KICK, player);
+		ImpactFx.hit(player, creeper, Anim.HEAVY);
+	}
+
 	private static void counter(ServerPlayer player, CombatState state, EnemySlot slot, long now) {
 		Mob mob = slot.mob;
+		if (mob instanceof Creeper creeper) {
+			kickCreeper(player, state, slot, creeper, now);
+			return;
+		}
 		int variant = chooseVariant(state, mob);
 		state.lastCounterVariant = variant;
 		state.fight.record(variant == MobReaction.COUNTER_THROW ? FightStats.MoveType.COUNTER_THROW

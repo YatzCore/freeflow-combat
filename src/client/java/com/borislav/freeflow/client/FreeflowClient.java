@@ -59,6 +59,7 @@ public class FreeflowClient implements ClientModInitializer {
 		});
 		HudRenderCallback.EVENT.register(ComboHud::render);
 		HudRenderCallback.EVENT.register(FightSummaryHud::render);
+		HudRenderCallback.EVENT.register(TelegraphRenderer::renderOffscreen);
 		ClientPlayNetworking.registerGlobalReceiver(FightSummaryPayload.TYPE,
 				(payload, context) -> FightSummaryHud.show(payload));
 		HudRenderCallback.EVENT.register(DebugOverlay::render);

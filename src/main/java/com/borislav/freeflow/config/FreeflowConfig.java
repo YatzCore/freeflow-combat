@@ -22,21 +22,21 @@ public final class FreeflowConfig {
 	// --- Strike ---
 
 	/** Max distance (blocks) a strike can snap to a target. */
-	public static double strikeRange = 8.0;
+	public static double strikeRange = 10.0;
 	/** Half-angle (degrees) of the targeting cone when a direction is held. */
 	public static double strikeConeDirectional = 60.0;
 	/** Half-angle (degrees) of the targeting cone with no direction held (uses camera facing). */
 	public static double strikeConeNeutral = 90.0;
 	/** Enemies this close are always eligible, even outside the cone. */
-	public static double strikeCloseRange = 2.5;
+	public static double strikeCloseRange = 3.0;
 	public static float strikeDamage = 4.0f;
 	public static double strikeKnockback = 0.35;
 	/** Heavy hits (kicks, haymakers, flying attacks) knock enemies back further and lift them. */
 	public static double heavyKnockback = 0.8;
 	public static double heavyLift = 0.3;
 	/** Lunge speed in blocks per tick (20 ticks = 1s). */
-	public static double lungeSpeed = 1.6;
-	public static int maxLungeTicks = 6;
+	public static double lungeSpeed = 1.9;
+	public static int maxLungeTicks = 7;
 	/** Gap (blocks) kept between the player and the target's hitbox edge when the lunge ends. */
 	public static double lungeStopGap = 0.8;
 	/** Ticks after a hit before the next strike starts (buffered presses wait for this). */
@@ -83,7 +83,7 @@ public final class FreeflowConfig {
 	// --- Counter ---
 
 	/** Telegraphed enemies within this distance are countered. */
-	public static double counterRange = 5.0;
+	public static double counterRange = 6.0;
 	public static float counterDamage = 3.0f;
 	public static double counterKnockback = 0.9;
 	/** How long a countered enemy is stunned (slowed, can't attack). */
@@ -94,6 +94,8 @@ public final class FreeflowConfig {
 	public static double counterThrowSpeed = 0.75;
 	public static double counterThrowLift = 0.5;
 	public static int counterThrowDownTicks = 40;
+	/** Creeper counter: how hard the creeper is kicked away (its fuse is reset). */
+	public static double creeperKickKnockback = 1.6;
 
 	// --- Evade / vault ---
 
@@ -104,7 +106,7 @@ public final class FreeflowConfig {
 	public static int evadeIframeTicks = 8;
 	public static int evadeCooldownTicks = 12;
 	/** Evading toward an enemy this close (and within the cone) vaults over it instead. */
-	public static double vaultRange = 3.5;
+	public static double vaultRange = 4.0;
 	public static double vaultCone = 35.0;
 	/** How far past the enemy the vault lands. */
 	public static double vaultLandBehind = 1.8;
@@ -115,7 +117,7 @@ public final class FreeflowConfig {
 
 	// --- Stun / beatdown / takedowns ---
 
-	public static double stunRange = 4.0;
+	public static double stunRange = 5.0;
 	/** How long a stun lasts (40 = 2s). */
 	public static int stunTicks = 40;
 	public static int stunCooldownTicks = 15;

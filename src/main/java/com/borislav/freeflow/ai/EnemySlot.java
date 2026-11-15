@@ -7,6 +7,8 @@ public class EnemySlot {
 	public final Mob mob;
 	/** Game tick the telegraphed attack lands, or -1 if not attacking. */
 	public long attackAt = -1;
+	/** The pending "attack" is a creeper fuse (it explodes on its own; counter = kick it away). */
+	public boolean creeper = false;
 	/** The pending attack is a ranged shot. */
 	public boolean ranged = false;
 	/** Telegraph kind of the pending attack (see {@link EnemyRole#telegraphKind()}). */

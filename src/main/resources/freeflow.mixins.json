@@ -3,10 +3,13 @@
 	"package": "com.borislav.freeflow.mixin",
 	"compatibilityLevel": "JAVA_21",
 	"mixins": [
+		"CreeperAccessor",
+		"InventoryMixin",
 		"MeleeAttackGoalMixin",
 		"MobMixin",
 		"RangedBowAttackGoalMixin",
-		"RangedCrossbowAttackGoalMixin"
+		"RangedCrossbowAttackGoalMixin",
+		"SlimeMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1
