@@ -307,18 +307,22 @@ public class FreeflowGameTests implements FabricGameTest {
 		Zombie a = zombie(h, 2.5, 3.5);
 		Zombie b = zombie(h, 3.5, 2.5);
 		Zombie c = zombie(h, 1.5, 2.5);
+		Zombie d = zombie(h, 3.5, 3.5);
+		Zombie e = zombie(h, 1.5, 3.5);
 		CombatState state = CombatStateManager.get(p);
 
 		h.assertTrue(CombatDirector.requestAttack(p, a), "A should get a turn");
 		h.assertTrue(!CombatDirector.requestAttack(p, b), "B must wait for the gap between attacks");
-		h.runAfterDelay(6, () -> {
-			h.assertTrue(CombatDirector.requestAttack(p, b), "B should get a turn after the gap");
-			h.runAfterDelay(4, () -> {
-				h.assertTrue(CombatDirector.activeAttacks(state) == 2, "two attacks should be in progress");
-				h.assertTrue(!CombatDirector.requestAttack(p, c), "C must wait: max 2 attackers at once");
-				h.succeed();
-			});
-		});
+
+		// Skip the start gap to check the cap on its own.
+		for (Zombie z : new Zombie[] {b, c, d}) {
+			state.lastTelegraphTick = -100;
+			h.assertTrue(CombatDirector.requestAttack(p, z), "up to 4 enemies may attack at once");
+		}
+		state.lastTelegraphTick = -100;
+		h.assertTrue(CombatDirector.activeAttacks(state) == 4, "four attacks should be in progress");
+		h.assertTrue(!CombatDirector.requestAttack(p, e), "the 5th enemy must wait: max 4 attackers at once");
+		h.succeed();
 	}
 
 	@GameTest(template = EMPTY_STRUCTURE)
@@ -345,20 +349,46 @@ public class FreeflowGameTests implements FabricGameTest {
 	}
 
 	@GameTest(template = EMPTY_STRUCTURE)
-	public void multiCounterHitsEveryAttacker(GameTestHelper h) {
+	public void eachCounterPressHandlesOneAttacker(GameTestHelper h) {
 		ServerPlayer p = player(h, CombatMode.FORCED_ON);
 		Zombie a = zombie(h, 2.5, 3.5);
 		Zombie b = zombie(h, 3.5, 2.5);
 		CombatState state = CombatStateManager.get(p);
 
 		CombatDirector.requestAttack(p, a);
-		h.runAfterDelay(6, () -> {
+		h.runAfterDelay(4, () -> {
 			h.assertTrue(CombatDirector.requestAttack(p, b), "B should start its attack");
-			CombatStateManager.handleInput(p, new CombatInputPayload(CombatAction.COUNTER, 0, 0, FACING_PLUS_Z));
-			h.assertTrue(CombatDirector.activeAttacks(state) == 0, "one press should counter both attackers");
+			counter(p);
+			h.assertTrue(CombatDirector.activeAttacks(state) == 1, "one press should counter only one attacker");
+			h.assertTrue(!state.enemies.get(a.getId()).isTelegraphing(), "the soonest attack (A) is countered first");
+			counter(p);
+			h.assertTrue(CombatDirector.activeAttacks(state) == 0, "a second press should counter the second attacker");
 			h.assertTrue(state.combo == 2, "each countered enemy adds a combo hit, combo was " + state.combo);
 			h.succeed();
 		});
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE)
+	public void missedCounterLetsAttackLand(GameTestHelper h) {
+		ServerPlayer p = player(h, CombatMode.FORCED_ON);
+		Zombie a = zombie(h, 2.5, 3.5);
+		Zombie b = zombie(h, 3.5, 2.5);
+		CombatState state = CombatStateManager.get(p);
+
+		CombatDirector.requestAttack(p, a);
+		h.runAfterDelay(4, () -> {
+			CombatDirector.requestAttack(p, b);
+			counter(p); // only one press for two warnings
+			h.succeedWhen(() -> {
+				h.assertTrue(CombatDirector.activeAttacks(state) == 0, "B's attack should resolve");
+				h.assertTrue(b.swinging, "the uncountered attacker should hit");
+				h.assertTrue(!a.swinging, "the countered attacker should not hit");
+			});
+		});
+	}
+
+	private static void counter(ServerPlayer p) {
+		CombatStateManager.handleInput(p, new CombatInputPayload(CombatAction.COUNTER, 0, 0, FACING_PLUS_Z));
 	}
 
 	@GameTest(template = EMPTY_STRUCTURE)

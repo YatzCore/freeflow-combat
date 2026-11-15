@@ -32,6 +32,8 @@ public final class ClientInputHandler {
 			FreeflowCamera.userEnabled = !FreeflowCamera.userEnabled;
 		}
 
+		useHeld = client.options.keyUse.isDown(); // re-arm the right-click counter once released
+
 		boolean active = ClientCombatState.isFreeflowActive();
 		pressed(Keybinds.counter, active, CombatAction.COUNTER);
 		pressed(Keybinds.evade, active, CombatAction.EVADE);
@@ -43,6 +45,20 @@ public final class ClientInputHandler {
 	/** Called from the attack-key mixin instead of the vanilla attack. */
 	public static void onStrike() {
 		send(CombatAction.STRIKE);
+	}
+
+	/** True while the use key (right mouse) is held after a counter was sent. */
+	private static boolean useHeld = false;
+
+	/**
+	 * Called from the use-key mixin instead of vanilla item use. Vanilla calls it again
+	 * every tick while the button is held, so only the first call per press counters.
+	 */
+	public static void onUsePressed() {
+		if (!useHeld) {
+			useHeld = true;
+			send(CombatAction.COUNTER);
+		}
 	}
 
 	private static void pressed(KeyMapping key, boolean active, CombatAction action) {

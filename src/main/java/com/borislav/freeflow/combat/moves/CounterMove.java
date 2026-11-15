@@ -18,12 +18,11 @@ import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Mob;
 
-import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Counter: cancels every telegraphed attack within range in one press (multi-counter),
- * hits and stuns each attacker, and adds one combo per countered enemy. Pressing it
+ * Counter: cancels the telegraphed attack that lands soonest (one press per attacker,
+ * so multiple warnings need multiple presses), hits and stuns it, +1 combo. Pressing it
  * with nothing to counter locks counters out briefly (no spamming).
  */
 public class CounterMove implements Move {
@@ -35,15 +34,18 @@ public class CounterMove implements Move {
 			return false;
 		}
 
-		List<EnemySlot> targets = new ArrayList<>();
+		// One press counters one attacker: the one whose hit lands soonest.
+		// Several warnings at once need several presses; any you miss will hit you.
+		EnemySlot target = null;
 		double range = FreeflowConfig.counterRange;
 		for (EnemySlot slot : state.enemies.values()) {
-			if (slot.isTelegraphing() && slot.mob.isAlive() && slot.mob.distanceToSqr(player) <= range * range) {
-				targets.add(slot);
+			if (slot.isTelegraphing() && slot.mob.isAlive() && slot.mob.distanceToSqr(player) <= range * range
+					&& (target == null || slot.attackAt < target.attackAt)) {
+				target = slot;
 			}
 		}
 
-		if (targets.isEmpty()) {
+		if (target == null) {
 			state.counterCooldownUntil = now + FreeflowConfig.counterWhiffTicks;
 			send(player, List.of());
 			return true;
@@ -56,13 +58,9 @@ public class CounterMove implements Move {
 		state.invulnerableUntil = now + 6;
 		state.nextStrikeTick = now + 4;
 
-		List<Integer> ids = new ArrayList<>();
-		for (EnemySlot slot : targets) {
-			counter(player, state, slot, now);
-			ids.add(slot.mob.getId());
-		}
+		counter(player, state, target, now);
 		player.swing(InteractionHand.MAIN_HAND, true);
-		send(player, ids);
+		send(player, List.of(target.mob.getId()));
 		return true;
 	}
 

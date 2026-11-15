@@ -66,11 +66,11 @@ public final class FreeflowConfig {
 	// --- Combat director (enemy turn-taking) ---
 
 	/** Max enemies with an attack in progress against one player at the same time. */
-	public static int maxSimultaneousAttackers = 2;
+	public static int maxSimultaneousAttackers = 4;
 	/** Warning time before an enemy attack lands (12 = 0.6s): the counter window. */
 	public static int telegraphTicks = 12;
 	/** Min ticks between two enemies starting their attacks. */
-	public static int telegraphGapTicks = 5;
+	public static int telegraphGapTicks = 3;
 	/** Per-enemy cooldown after attacking, randomised between min and max. */
 	public static int enemyAttackCooldownMin = 25;
 	public static int enemyAttackCooldownMax = 50;

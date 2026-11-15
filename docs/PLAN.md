@@ -18,7 +18,7 @@ Project lives in this repo; JDK 21 (Temurin) is required to build.
 2. **Strike + target snap** — left-click picks best target in a ~60° cone within 8 blocks (score = angle, distance, threat, input direction via WASD). Player lunges (scripted velocity, brief i-frames) and hits. Alternating punch/kick animations.
 3. **Combo meter** — +1 per hit; breaks after ~1.5s idle or when damaged. Combo scales damage, lunge range (up to ~12 blocks at high combo), and animation speed.
 4. **Rhythm** — clicking faster than the beat window = "whiff" stagger (~0.4s); on-beat keeps flow. HUD pulse shows the window.
-5. **Counter** — mobs telegraph attacks with a floating marker ~0.5s ahead (combat director delays their attack). Counter key (`R`) in window: cancel attack, counter animation, knockdown/stun. Multi-counter when 2–3 telegraph at once (one press counters all).
+5. **Counter** — mobs telegraph attacks with a floating marker ~0.5s ahead (combat director delays their attack). Counter on **right mouse** (or `R`) in window: cancel attack, counter animation, knockdown/stun. **One press per warning**: when several enemies telegraph at once you must counter each one (soonest first); any you miss hits you.
 6. **Evade / vault** — double-tap direction or `Space`+dir in combat: dodge roll. Toward an enemy: vault over it (lands behind, keeps combo).
 7. **Stun + beatdown** — stun key (`G`) dazes target; holding strike on a stunned mob = rapid beatdown flurry ending in knockback.
 8. **Ground takedown** — knocked-down mobs can be finished (combo ≥5) with a ground slam key, kills non-boss mob.
@@ -29,7 +29,7 @@ Project lives in this repo; JDK 21 (Temurin) is required to build.
     - **Armed / uncounterable** (red telegraph, e.g. vindicator, mobs with axes): must evade.
     - **Ranged** (skeleton, pillager): telegraph projectile; counter = deflect/dodge, director limits active shooters.
     - Bosses/large mobs (warden, ravager, iron golem): immune to takedowns, reduced snap.
-11. **Combat director** — per-player attack-token system: max 1–2 mobs attacking at once, others circle/strafe at distance. This is the core "Arkham feel" piece.
+11. **Combat director** — per-player attack-token system: max **4** mobs attacking at once (3-tick gap between starts), others circle/strafe at distance. This is the core "Arkham feel" piece.
 12. **Juice** — FOV punch on hit, hit-stop (2–3 frame freeze), optional slow-mo + camera nudge on the last enemy's final hit, custom sounds, impact particles, combo HUD with flair at x5/x10/x20.
 13. **Arkham-style camera** (client-only, toggleable):
     - **Over-the-shoulder 3rd person** as the default in combat mode (optional: everywhere). Offset right of the player, smooth spring-damped follow; shoulder swap key.
