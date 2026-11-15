@@ -1,6 +1,7 @@
 package com.borislav.freeflow.combat.moves;
 
 import com.borislav.freeflow.combat.Anim;
+import com.borislav.freeflow.combat.FightStats;
 import com.borislav.freeflow.combat.CombatState;
 import com.borislav.freeflow.combat.Directions;
 import com.borislav.freeflow.combat.TargetSelector;
@@ -46,6 +47,7 @@ public class EvadeMove implements Move {
 		state.evadeCooldownUntil = now + FreeflowConfig.evadeCooldownTicks;
 		state.lastVaultTarget = vaultTarget;
 		Anim.play(player, vaultTarget != null ? Anim.VAULT : Anim.EVADE);
+		state.fight.record(vaultTarget != null ? FightStats.MoveType.VAULT : FightStats.MoveType.EVADE);
 
 		float distance;
 		int ticks;

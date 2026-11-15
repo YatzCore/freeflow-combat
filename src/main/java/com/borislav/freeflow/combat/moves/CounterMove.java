@@ -7,6 +7,7 @@ import com.borislav.freeflow.network.CombatEventPayload;
 import com.borislav.freeflow.network.TelegraphPayload;
 import com.borislav.freeflow.ai.EnemySlot;
 import com.borislav.freeflow.combat.Anim;
+import com.borislav.freeflow.combat.FightStats;
 import com.borislav.freeflow.combat.CombatState;
 import com.borislav.freeflow.combat.ComboTracker;
 import com.borislav.freeflow.config.FreeflowConfig;
@@ -99,6 +100,7 @@ public class CounterMove implements Move {
 		player.serverLevel().playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.SHIELD_BLOCK,
 				SoundSource.PLAYERS, 0.8f, 1.6f);
 		EnemyStatus.event(player, CombatEventPayload.Type.DEFLECT, slot.mob, 0);
+		state.fight.record(FightStats.MoveType.DEFLECT);
 	}
 
 	private static Mob firstArmed(CombatState state) {
@@ -130,6 +132,8 @@ public class CounterMove implements Move {
 		Mob mob = slot.mob;
 		int variant = chooseVariant(state, mob);
 		state.lastCounterVariant = variant;
+		state.fight.record(variant == MobReaction.COUNTER_THROW ? FightStats.MoveType.COUNTER_THROW
+				: variant == MobReaction.COUNTER_KICK ? FightStats.MoveType.COUNTER_KICK : FightStats.MoveType.COUNTER);
 
 		mob.invulnerableTime = 0;
 		mob.hurt(player.damageSources().playerAttack(player), FreeflowConfig.counterDamage);

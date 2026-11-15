@@ -903,6 +903,44 @@ public class FreeflowGameTests implements FabricGameTest {
 		h.succeed();
 	}
 
+	// --- Milestone 12: fight rating ---
+
+	@GameTest(template = EMPTY_STRUCTURE)
+	public void fightScoreMath(GameTestHelper h) {
+		com.borislav.freeflow.combat.FightStats f = new com.borislav.freeflow.combat.FightStats();
+		for (int i = 0; i < 3; i++) {
+			f.record(com.borislav.freeflow.combat.FightStats.MoveType.STRIKE);
+		}
+		f.record(com.borislav.freeflow.combat.FightStats.MoveType.COUNTER_THROW);
+		f.record(com.borislav.freeflow.combat.FightStats.MoveType.GROUND_TAKEDOWN);
+		// base 3*10 + 25 + 50 + maxCombo 5*15 = 180; 3 move types -> x1.2; flawless x1.5 -> 324
+		h.assertTrue(f.score(5) == 324, "flawless score should be 324, was " + f.score(5));
+		h.assertTrue(com.borislav.freeflow.combat.FightStats.xpFor(324) == 6, "324 points -> 6 XP");
+		f.damageTaken = 1;
+		h.assertTrue(f.score(5) == 216, "taking a hit loses the flawless bonus, was " + f.score(5));
+		h.succeed();
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE, timeoutTicks = 200)
+	public void fightEndAwardsRatingAndXp(GameTestHelper h) {
+		ServerPlayer p = player(h, CombatMode.AUTO);
+		Zombie z = zombie(h, 2.5, 4.0);
+		z.setTarget(p);
+		CombatState state = CombatStateManager.get(p);
+		int xpBefore = p.totalExperience;
+
+		h.runAfterDelay(8, () -> {
+			h.assertTrue(state.inCombat, "the targeting zombie should start a fight");
+			strike(p, FACING_PLUS_Z, 0, 0);
+		});
+		h.runAfterDelay(16, z::discard); // fight's over: the calm timer starts
+		h.succeedWhen(() -> {
+			h.assertTrue(state.lastSummary != null, "a rating should be given when the fight ends");
+			h.assertTrue(state.lastSummary.score() > 0 && state.lastSummary.hits() >= 1, "rating should count the hit");
+			h.assertTrue(p.totalExperience > xpBefore, "the rating awards bonus XP");
+		});
+	}
+
 	private static void counter(ServerPlayer p) {
 		CombatStateManager.handleInput(p, new CombatInputPayload(CombatAction.COUNTER, 0, 0, FACING_PLUS_Z));
 	}

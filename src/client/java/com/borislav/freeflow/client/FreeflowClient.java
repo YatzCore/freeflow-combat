@@ -11,6 +11,8 @@ import com.borislav.freeflow.client.camera.FreeflowCamera;
 import com.borislav.freeflow.client.camera.Impact;
 import com.borislav.freeflow.client.hud.TargetIndicator;
 import com.borislav.freeflow.client.hud.ComboHud;
+import com.borislav.freeflow.client.hud.FightSummaryHud;
+import com.borislav.freeflow.network.FightSummaryPayload;
 import com.borislav.freeflow.client.hud.DebugOverlay;
 import com.borislav.freeflow.client.hud.StatusMarkers;
 import com.borislav.freeflow.client.hud.TelegraphRenderer;
@@ -56,6 +58,9 @@ public class FreeflowClient implements ClientModInitializer {
 			MobAnimator.tick(client);
 		});
 		HudRenderCallback.EVENT.register(ComboHud::render);
+		HudRenderCallback.EVENT.register(FightSummaryHud::render);
+		ClientPlayNetworking.registerGlobalReceiver(FightSummaryPayload.TYPE,
+				(payload, context) -> FightSummaryHud.show(payload));
 		HudRenderCallback.EVENT.register(DebugOverlay::render);
 
 		ClientPlayNetworking.registerGlobalReceiver(CombatSyncPayload.TYPE,
@@ -91,6 +96,7 @@ public class FreeflowClient implements ClientModInitializer {
 			CinematicShots.reset();
 			Impact.reset();
 			MobAnimator.reset();
+			FightSummaryHud.reset();
 			CombatFraming.reset();
 			TargetIndicator.reset();
 			StatusMarkers.reset();

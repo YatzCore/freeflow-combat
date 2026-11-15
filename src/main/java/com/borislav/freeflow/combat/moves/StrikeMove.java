@@ -4,6 +4,7 @@ import com.borislav.freeflow.ai.CombatDirector;
 import com.borislav.freeflow.ai.EnemySlot;
 import com.borislav.freeflow.ai.EnemyStatus;
 import com.borislav.freeflow.combat.Anim;
+import com.borislav.freeflow.combat.FightStats;
 import com.borislav.freeflow.combat.CombatModeTracker;
 import com.borislav.freeflow.combat.CombatState;
 import com.borislav.freeflow.combat.ComboTracker;
@@ -149,6 +150,7 @@ public class StrikeMove implements Move {
 				: beatdown ? Anim.beatdown(state.strikeIndex)
 				: Anim.chooseStrike(state.strikeIndex, travel, state.combo);
 		state.strikeStrength = Anim.strength(move);
+		state.strikeMove = move;
 		Anim.play(player, move);
 
 		state.strikeTarget = target;
@@ -179,6 +181,7 @@ public class StrikeMove implements Move {
 		if (special) {
 			EnemyStatus.knockOut(player, target);
 			EnemyStatus.event(player, CombatEventPayload.Type.SPECIAL_TAKEDOWN, target, 0);
+			state.fight.record(FightStats.MoveType.SPECIAL_TAKEDOWN);
 			ImpactFx.hit(player, target, Anim.HEAVY);
 			return ComboTracker.recoveryTicks(state) + 2;
 		}
@@ -225,6 +228,7 @@ public class StrikeMove implements Move {
 				target.knockback(FreeflowConfig.finisherKnockback, player.getX() - target.getX(), player.getZ() - target.getZ());
 				EnemyStatus.knockDown(player, state, target, FreeflowConfig.knockdownTicks);
 				Anim.play(player, Anim.FINISHER);
+				state.fight.record(FightStats.MoveType.FINISHER);
 				strength = Anim.HEAVY;
 				recovery = ComboTracker.recoveryTicks(state) + 2;
 			}
@@ -233,6 +237,8 @@ public class StrikeMove implements Move {
 			ImpactFx.knockback(player, target, strength);
 		}
 
+		state.fight.record(beatdown ? FightStats.MoveType.BEATDOWN
+				: state.strikeMove.startsWith("flying") ? FightStats.MoveType.FLYING : FightStats.MoveType.STRIKE);
 		if (!target.isAlive() || !slot.isKnockedDown(now)) {
 			EnemyStatus.reactToHit(player, target, strength); // a finisher already sent its knockdown fall
 		}

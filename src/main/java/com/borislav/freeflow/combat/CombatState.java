@@ -64,6 +64,8 @@ public class CombatState {
 	public Mob lastStrikeMob;
 	/** The strike in flight is a special takedown. */
 	public boolean strikeIsSpecial = false;
+	/** Animation name of the strike in flight (for fight stats). */
+	public String strikeMove = "";
 	/** Strength of the strike in flight (Anim.LIGHT / MEDIUM / HEAVY). */
 	public int strikeStrength = 2;
 	public long stunCooldownUntil = 0;
@@ -72,6 +74,13 @@ public class CombatState {
 	@Nullable
 	public Mob takedownTarget;
 	public long takedownEndTick = -1;
+
+	// --- Fight rating ---
+	public FightStats fight = new FightStats();
+	public boolean wasInCombat = false;
+	/** Last fight summary sent (for tests / debugging). */
+	@Nullable
+	public com.borislav.freeflow.network.FightSummaryPayload lastSummary;
 
 	/** Game tick of the last fight-ending hit (cinematic finisher). */
 	public long lastFinalHitTick = -1;

@@ -3,6 +3,7 @@ package com.borislav.freeflow.combat.moves;
 import com.borislav.freeflow.ai.EnemySlot;
 import com.borislav.freeflow.ai.EnemyStatus;
 import com.borislav.freeflow.combat.Anim;
+import com.borislav.freeflow.combat.FightStats;
 import com.borislav.freeflow.combat.CombatState;
 import com.borislav.freeflow.combat.ComboTracker;
 import com.borislav.freeflow.combat.Directions;
@@ -77,6 +78,7 @@ public class GroundTakedownMove implements Move {
 		EnemyStatus.knockOut(player, target);
 		ComboTracker.onHit(player, state);
 		ImpactFx.hit(player, target, Anim.HEAVY);
+		state.fight.record(FightStats.MoveType.GROUND_TAKEDOWN);
 		EnemyStatus.event(player, CombatEventPayload.Type.TAKEDOWN, target, 0);
 		player.serverLevel().playSound(null, target.getX(), target.getY(), target.getZ(),
 				SoundEvents.PLAYER_ATTACK_KNOCKBACK, SoundSource.PLAYERS, 1.3f, 0.5f);

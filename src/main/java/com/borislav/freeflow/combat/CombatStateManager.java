@@ -6,6 +6,8 @@ import com.borislav.freeflow.combat.moves.Move;
 import com.borislav.freeflow.combat.moves.MoveRegistry;
 import com.borislav.freeflow.network.CombatInputPayload;
 import com.borislav.freeflow.network.CombatSyncPayload;
+import com.borislav.freeflow.network.FightSummaryPayload;
+import net.minecraft.world.entity.Mob;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
@@ -52,6 +54,17 @@ public final class CombatStateManager {
 				if (state != null) {
 					ComboTracker.breakCombo(player, state);
 					GroundTakedownMove.interrupt(player, state);
+					state.fight.damageTaken++;
+				}
+			}
+		});
+
+		// Enemies the player finishes off count as knock-outs in the fight rating.
+		ServerLivingEntityEvents.AFTER_DEATH.register((entity, source) -> {
+			if (entity instanceof Mob && source.getEntity() instanceof ServerPlayer player) {
+				CombatState state = STATES.get(player.getUUID());
+				if (state != null && state.inCombat) {
+					state.fight.knockouts++;
 				}
 			}
 		});
@@ -71,6 +84,16 @@ public final class CombatStateManager {
 		CombatState state = get(player);
 		CombatModeTracker.tick(player, state);
 
+		// Fight start / end -> rating.
+		if (state.inCombat && !state.wasInCombat) {
+			state.fight = new FightStats();
+			state.fight.startTick = player.level().getGameTime();
+			state.maxCombo = 0;
+		} else if (!state.inCombat && state.wasInCombat) {
+			finishFight(player, state);
+		}
+		state.wasInCombat = state.inCombat;
+
 		if (CombatModeTracker.isFreeflowActive(player, state)) {
 			for (Move move : MoveRegistry.all()) {
 				move.tick(player, state);
@@ -87,6 +110,27 @@ public final class CombatStateManager {
 
 		if (state.dirty) {
 			sync(player, state);
+		}
+	}
+
+	/** Rates the fight that just ended, awards bonus XP and shows the summary. */
+	public static void finishFight(ServerPlayer player, CombatState state) {
+		FightStats fight = state.fight;
+		state.fight = new FightStats();
+		if (!player.isAlive() || !fight.hasActivity()) {
+			return; // died, or nothing happened
+		}
+		int score = fight.score(state.maxCombo);
+		int xp = FightStats.xpFor(score);
+		if (xp > 0) {
+			player.giveExperiencePoints(xp);
+		}
+		int seconds = (int) ((player.level().getGameTime() - fight.startTick) / 20);
+		FightSummaryPayload summary = new FightSummaryPayload(score, state.maxCombo, fight.hits, fight.counters,
+				fight.takedowns + fight.specials, fight.knockouts, fight.moves.size(), fight.isFlawless(), xp, seconds);
+		state.lastSummary = summary;
+		if (ServerPlayNetworking.canSend(player, FightSummaryPayload.TYPE)) {
+			ServerPlayNetworking.send(player, summary);
 		}
 	}
 
