@@ -1,3 +1,11 @@
 {
-	"modmenu.nameTranslation.freeflow": "Freeflow Combat"
+	"modmenu.nameTranslation.freeflow": "Freeflow Combat",
+	"key.categories.freeflow": "Freeflow Combat",
+	"key.freeflow.counter": "Counter",
+	"key.freeflow.evade": "Evade / Vault",
+	"key.freeflow.stun": "Stun",
+	"key.freeflow.ground_takedown": "Ground Takedown",
+	"key.freeflow.special_takedown": "Special Takedown",
+	"key.freeflow.toggle_mode": "Cycle Combat Mode",
+	"key.freeflow.debug_overlay": "Toggle Debug Overlay"
 }

@@ -1,5 +1,7 @@
 package com.borislav.freeflow;
 
+import com.borislav.freeflow.combat.CombatStateManager;
+import com.borislav.freeflow.network.FreeflowNetworking;
 import net.fabricmc.api.ModInitializer;
 import net.minecraft.resources.ResourceLocation;
 import org.slf4j.Logger;
@@ -20,5 +22,7 @@ public class FreeflowMod implements ModInitializer {
 	@Override
 	public void onInitialize() {
 		LOGGER.info("Freeflow Combat initializing");
+		FreeflowNetworking.registerPayloads();
+		CombatStateManager.init();
 	}
 }
