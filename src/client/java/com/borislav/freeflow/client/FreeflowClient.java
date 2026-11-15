@@ -4,6 +4,7 @@ import com.borislav.freeflow.FreeflowMod;
 import com.borislav.freeflow.client.camera.FreeflowCamera;
 import com.borislav.freeflow.client.hud.DebugOverlay;
 import com.borislav.freeflow.network.CombatSyncPayload;
+import com.borislav.freeflow.network.StrikeStartPayload;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
@@ -25,10 +26,15 @@ public class FreeflowClient implements ClientModInitializer {
 		});
 		HudRenderCallback.EVENT.register(DebugOverlay::render);
 
+		ClientTickEvents.START_CLIENT_TICK.register(LungeController::tick);
+
 		ClientPlayNetworking.registerGlobalReceiver(CombatSyncPayload.TYPE,
 				(payload, context) -> ClientCombatState.apply(payload));
+		ClientPlayNetworking.registerGlobalReceiver(StrikeStartPayload.TYPE,
+				(payload, context) -> LungeController.onStrikeStart(payload));
 		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
 			FreeflowCamera.exit(client);
+			LungeController.reset();
 			ClientCombatState.reset();
 		});
 	}

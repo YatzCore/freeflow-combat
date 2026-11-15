@@ -10,7 +10,8 @@
 	"environment": "*",
 	"entrypoints": {
 		"main": ["com.borislav.freeflow.FreeflowMod"],
-		"client": ["com.borislav.freeflow.client.FreeflowClient"]
+		"client": ["com.borislav.freeflow.client.FreeflowClient"],
+		"fabric-gametest": ["com.borislav.freeflow.test.FreeflowGameTests"]
 	},
 	"mixins": [
 		"freeflow.mixins.json",

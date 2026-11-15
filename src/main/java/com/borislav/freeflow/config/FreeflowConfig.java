@@ -19,6 +19,30 @@ public final class FreeflowConfig {
 	/** If false, freeflow only works with an empty main hand (fists only). */
 	public static boolean allowNonEmptyHand = false;
 
+	// --- Strike ---
+
+	/** Max distance (blocks) a strike can snap to a target. */
+	public static double strikeRange = 8.0;
+	/** Half-angle (degrees) of the targeting cone when a direction is held. */
+	public static double strikeConeDirectional = 60.0;
+	/** Half-angle (degrees) of the targeting cone with no direction held (uses camera facing). */
+	public static double strikeConeNeutral = 90.0;
+	/** Enemies this close are always eligible, even outside the cone. */
+	public static double strikeCloseRange = 2.5;
+	public static float strikeDamage = 4.0f;
+	public static double strikeKnockback = 0.35;
+	/** Lunge speed in blocks per tick (20 ticks = 1s). */
+	public static double lungeSpeed = 1.6;
+	public static int maxLungeTicks = 6;
+	/** Gap (blocks) kept between the player and the target's hitbox edge when the lunge ends. */
+	public static double lungeStopGap = 0.8;
+	/** Ticks after a hit before the next strike starts (buffered presses wait for this). */
+	public static int strikeRecoveryTicks = 3;
+	/** Ticks of recovery after striking at nothing. */
+	public static int whiffRecoveryTicks = 6;
+	/** Extra distance tolerated at hit time (lag / prediction error). */
+	public static double hitValidationSlack = 2.5;
+
 	// --- Camera (client) ---
 
 	/** Master switch for the over-the-shoulder combat camera. */

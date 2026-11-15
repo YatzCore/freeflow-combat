@@ -1,6 +1,7 @@
 package com.borislav.freeflow.client.hud;
 
 import com.borislav.freeflow.client.ClientCombatState;
+import com.borislav.freeflow.client.LungeController;
 import com.borislav.freeflow.client.camera.FreeflowCamera;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
@@ -28,6 +29,7 @@ public final class DebugOverlay {
 				"Freeflow active: " + active + (ClientCombatState.inCombat && !active ? " (hand not empty)" : ""),
 				"Sent: " + ClientCombatState.lastSentAction + " #" + ClientCombatState.sentInputs,
 				"Server ack: " + ClientCombatState.lastAcceptedAction + " #" + ClientCombatState.acceptedInputs,
+				"Strike target: " + LungeController.lastTargetName + (LungeController.isLunging() ? " (lunging)" : ""),
 				"Camera: " + (FreeflowCamera.isActive() ? "orbit" : (FreeflowCamera.userEnabled ? "idle" : "disabled [J]"))
 						+ "  shoulder: " + (FreeflowCamera.shoulderSide() > 0 ? "R" : "L") + " [H]"
 						+ String.format("  dist %.1f", FreeflowCamera.currentDistance()),

@@ -1,5 +1,7 @@
 package com.borislav.freeflow.client.camera;
 
+import com.borislav.freeflow.client.LungeController;
+import com.borislav.freeflow.combat.Directions;
 import com.borislav.freeflow.config.FreeflowConfig;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.Input;
@@ -23,6 +25,13 @@ public final class RelativeMovement {
 		rawForward = input.forwardImpulse;
 		rawLeft = input.leftImpulse;
 
+		if (LungeController.isLunging()) {
+			// The lunge drives movement; WASD must not add to it.
+			input.forwardImpulse = 0.0f;
+			input.leftImpulse = 0.0f;
+			input.up = input.down = input.left = input.right = false;
+			return;
+		}
 		if (!FreeflowCamera.isActive()) {
 			return;
 		}
@@ -38,7 +47,7 @@ public final class RelativeMovement {
 			return; // standing still: body keeps its facing
 		}
 
-		float targetYaw = worldYaw(FreeflowCamera.yaw(), fwd, left);
+		float targetYaw = Directions.worldYaw(FreeflowCamera.yaw(), fwd, left);
 		float bodyYaw = player.getYRot();
 		float newYaw = bodyYaw + Mth.clamp(Mth.wrapDegrees(targetYaw - bodyYaw),
 				-FreeflowConfig.cameraBodyTurnSpeed, FreeflowConfig.cameraBodyTurnSpeed);
@@ -53,16 +62,5 @@ public final class RelativeMovement {
 		input.down = input.forwardImpulse < -0.1f;
 		input.left = input.leftImpulse > 0.1f;
 		input.right = input.leftImpulse < -0.1f;
-	}
-
-	/**
-	 * World-space yaw of a movement input (forward/left) relative to a reference yaw.
-	 * Matches vanilla Entity.moveRelative: forward = (-sin, cos), left = (cos, sin).
-	 */
-	public static float worldYaw(float referenceYaw, float forward, float left) {
-		float r = referenceYaw * Mth.DEG_TO_RAD;
-		double dx = left * Mth.cos(r) - forward * Mth.sin(r);
-		double dz = forward * Mth.cos(r) + left * Mth.sin(r);
-		return (float) Math.toDegrees(Math.atan2(-dx, dz));
 	}
 }

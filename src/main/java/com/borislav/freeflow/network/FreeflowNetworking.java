@@ -9,5 +9,6 @@ public final class FreeflowNetworking {
 	public static void registerPayloads() {
 		PayloadTypeRegistry.playC2S().register(CombatInputPayload.TYPE, CombatInputPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(CombatSyncPayload.TYPE, CombatSyncPayload.CODEC);
+		PayloadTypeRegistry.playS2C().register(StrikeStartPayload.TYPE, StrikeStartPayload.CODEC);
 	}
 }
