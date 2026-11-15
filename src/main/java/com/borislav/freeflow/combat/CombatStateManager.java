@@ -51,8 +51,8 @@ public final class CombatStateManager {
 				return; // stale/forged input: ignore
 			}
 			// Moves are executed here from milestone 4 on (MoveRegistry).
-			FreeflowMod.LOGGER.debug("{} -> {} (fwd={}, strafe={})", player.getName().getString(), action,
-					payload.forward(), payload.strafe());
+			FreeflowMod.LOGGER.debug("{} -> {} (fwd={}, strafe={}, aimYaw={})", player.getName().getString(), action,
+					payload.forward(), payload.strafe(), payload.aimYaw());
 		} else {
 			return;
 		}

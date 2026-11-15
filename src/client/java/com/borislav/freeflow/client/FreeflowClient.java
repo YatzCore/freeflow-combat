@@ -1,6 +1,7 @@
 package com.borislav.freeflow.client;
 
 import com.borislav.freeflow.FreeflowMod;
+import com.borislav.freeflow.client.camera.FreeflowCamera;
 import com.borislav.freeflow.client.hud.DebugOverlay;
 import com.borislav.freeflow.network.CombatSyncPayload;
 import net.fabricmc.api.ClientModInitializer;
@@ -18,11 +19,17 @@ public class FreeflowClient implements ClientModInitializer {
 		FreeflowMod.LOGGER.info("Freeflow Combat client initializing");
 
 		Keybinds.register();
-		ClientTickEvents.END_CLIENT_TICK.register(ClientInputHandler::tick);
+		ClientTickEvents.END_CLIENT_TICK.register(client -> {
+			ClientInputHandler.tick(client);
+			FreeflowCamera.tick(client);
+		});
 		HudRenderCallback.EVENT.register(DebugOverlay::render);
 
 		ClientPlayNetworking.registerGlobalReceiver(CombatSyncPayload.TYPE,
 				(payload, context) -> ClientCombatState.apply(payload));
-		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> ClientCombatState.reset());
+		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
+			FreeflowCamera.exit(client);
+			ClientCombatState.reset();
+		});
 	}
 }

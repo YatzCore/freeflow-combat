@@ -18,4 +18,23 @@ public final class FreeflowConfig {
 
 	/** If false, freeflow only works with an empty main hand (fists only). */
 	public static boolean allowNonEmptyHand = false;
+
+	// --- Camera (client) ---
+
+	/** Master switch for the over-the-shoulder combat camera. */
+	public static boolean cameraEnabled = true;
+	/** If true the camera is used all the time, not only while freeflow is active. */
+	public static boolean cameraEverywhere = false;
+	/** Distance (blocks) behind the player. */
+	public static double cameraDistance = 4.0;
+	/** Sideways shoulder offset (blocks). */
+	public static double cameraShoulderOffset = 0.85;
+	/** Extra height above the eyes (blocks). */
+	public static double cameraHeight = 0.3;
+	/** How quickly the camera catches up with the player (higher = tighter). */
+	public static double cameraFollowSharpness = 14.0;
+	/** How quickly the camera eases back out after being pushed in by a wall. */
+	public static double cameraZoomOutSharpness = 4.0;
+	/** Max degrees per tick the player body turns toward the movement direction. */
+	public static float cameraBodyTurnSpeed = 40.0f;
 }

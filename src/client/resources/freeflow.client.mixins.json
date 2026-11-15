@@ -3,6 +3,9 @@
 	"package": "com.borislav.freeflow.mixin.client",
 	"compatibilityLevel": "JAVA_21",
 	"client": [
+		"CameraMixin",
+		"EntityTurnMixin",
+		"KeyboardInputMixin",
 		"MinecraftMixin"
 	],
 	"injectors": {

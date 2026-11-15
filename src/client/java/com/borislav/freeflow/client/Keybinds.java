@@ -22,6 +22,8 @@ public final class Keybinds {
 	public static KeyMapping specialTakedown;
 	public static KeyMapping toggleMode;
 	public static KeyMapping debugOverlay;
+	public static KeyMapping swapShoulder;
+	public static KeyMapping toggleCamera;
 
 	public static void register() {
 		counter = key("counter", GLFW.GLFW_KEY_R);
@@ -31,6 +33,8 @@ public final class Keybinds {
 		specialTakedown = key("special_takedown", GLFW.GLFW_KEY_Z);
 		toggleMode = key("toggle_mode", GLFW.GLFW_KEY_B);
 		debugOverlay = key("debug_overlay", GLFW.GLFW_KEY_F7);
+		swapShoulder = key("swap_shoulder", GLFW.GLFW_KEY_H);
+		toggleCamera = key("toggle_camera", GLFW.GLFW_KEY_J);
 	}
 
 	private static KeyMapping key(String name, int glfwKey) {

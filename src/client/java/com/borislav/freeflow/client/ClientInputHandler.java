@@ -1,5 +1,7 @@
 package com.borislav.freeflow.client;
 
+import com.borislav.freeflow.client.camera.FreeflowCamera;
+import com.borislav.freeflow.client.camera.RelativeMovement;
 import com.borislav.freeflow.client.hud.DebugOverlay;
 import com.borislav.freeflow.combat.CombatAction;
 import com.borislav.freeflow.network.CombatInputPayload;
@@ -22,6 +24,12 @@ public final class ClientInputHandler {
 		}
 		while (Keybinds.toggleMode.consumeClick()) {
 			send(CombatAction.TOGGLE_MODE);
+		}
+		while (Keybinds.swapShoulder.consumeClick()) {
+			FreeflowCamera.swapShoulder();
+		}
+		while (Keybinds.toggleCamera.consumeClick()) {
+			FreeflowCamera.userEnabled = !FreeflowCamera.userEnabled;
 		}
 
 		boolean active = ClientCombatState.isFreeflowActive();
@@ -50,7 +58,10 @@ public final class ClientInputHandler {
 		if (player == null || !ClientPlayNetworking.canSend(CombatInputPayload.TYPE)) {
 			return; // server doesn't have the mod
 		}
-		ClientPlayNetworking.send(new CombatInputPayload(action, player.input.forwardImpulse, player.input.leftImpulse));
+		// Direction is sent as raw WASD relative to the aim yaw (camera yaw when orbiting),
+		// so the server can resolve "attack the enemy I'm pushing toward".
+		float aimYaw = FreeflowCamera.isActive() ? FreeflowCamera.yaw() : player.getYRot();
+		ClientPlayNetworking.send(new CombatInputPayload(action, RelativeMovement.rawForward, RelativeMovement.rawLeft, aimYaw));
 		ClientCombatState.lastSentAction = action;
 		ClientCombatState.sentInputs++;
 	}

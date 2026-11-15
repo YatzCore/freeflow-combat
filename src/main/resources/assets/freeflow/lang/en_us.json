@@ -7,5 +7,7 @@
 	"key.freeflow.ground_takedown": "Ground Takedown",
 	"key.freeflow.special_takedown": "Special Takedown",
 	"key.freeflow.toggle_mode": "Cycle Combat Mode",
-	"key.freeflow.debug_overlay": "Toggle Debug Overlay"
+	"key.freeflow.debug_overlay": "Toggle Debug Overlay",
+	"key.freeflow.swap_shoulder": "Swap Camera Shoulder",
+	"key.freeflow.toggle_camera": "Toggle Combat Camera"
 }
