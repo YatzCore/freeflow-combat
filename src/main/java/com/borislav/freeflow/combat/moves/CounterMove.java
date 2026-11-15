@@ -43,7 +43,8 @@ public class CounterMove implements Move {
 
 		// One press counters one attacker: the one whose hit lands soonest.
 		// Several warnings at once need several presses; any you miss will hit you.
-		// Armed (red) attacks can't be countered; ranged shots are deflected at any distance.
+		// Armed (red) attacks and shots from ranged enemies (yellow) can't be countered:
+		// like the Arkham games you don't counter a gun, you evade it.
 		EnemySlot target = null;
 		boolean armedIncoming = false;
 		double range = FreeflowConfig.counterRange;
@@ -51,11 +52,11 @@ public class CounterMove implements Move {
 			if (!slot.isTelegraphing() || !slot.mob.isAlive()) {
 				continue;
 			}
-			if (slot.kind == TelegraphPayload.ARMED) {
+			if (isUncounterable(slot)) {
 				armedIncoming = true;
 				continue;
 			}
-			boolean inReach = slot.ranged || slot.mob.distanceToSqr(player) <= range * range;
+			boolean inReach = slot.mob.distanceToSqr(player) <= range * range;
 			if (inReach && (target == null || slot.attackAt < target.attackAt)) {
 				target = slot;
 			}
@@ -68,13 +69,6 @@ public class CounterMove implements Move {
 				EnemyStatus.event(player, CombatEventPayload.Type.CANT_COUNTER, armed, 0); // "evade it!"
 			}
 			send(player, List.of());
-			return true;
-		}
-
-		if (target.ranged) {
-			deflect(player, state, target, now);
-			Anim.play(player, Anim.COUNTER);
-			send(player, List.of(target.mob.getId()));
 			return true;
 		}
 
@@ -91,23 +85,14 @@ public class CounterMove implements Move {
 		return true;
 	}
 
-	/** Ranged counter: knock the shot aside. The shooter isn't stunned (it's far away). */
-	private static void deflect(ServerPlayer player, CombatState state, EnemySlot slot, long now) {
-		slot.attackAt = -1;
-		slot.nextAllowed = now + FreeflowConfig.rangedCooldownMin;
-		CombatDirector.sendTelegraph(player, slot.mob, 0);
-		state.invulnerableUntil = Math.max(state.invulnerableUntil, now + 4);
-		ComboTracker.onHit(player, state);
-		player.swing(InteractionHand.OFF_HAND, true);
-		player.serverLevel().playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.SHIELD_BLOCK,
-				SoundSource.PLAYERS, 0.8f, 1.6f);
-		EnemyStatus.event(player, CombatEventPayload.Type.DEFLECT, slot.mob, 0);
-		state.fight.record(FightStats.MoveType.DEFLECT);
+	/** Armed melee and ranged shots can only be evaded. */
+	public static boolean isUncounterable(EnemySlot slot) {
+		return slot.kind == TelegraphPayload.ARMED || slot.ranged;
 	}
 
 	private static Mob firstArmed(CombatState state) {
 		for (EnemySlot slot : state.enemies.values()) {
-			if (slot.isTelegraphing() && slot.kind == TelegraphPayload.ARMED) {
+			if (slot.isTelegraphing() && isUncounterable(slot)) {
 				return slot.mob;
 			}
 		}

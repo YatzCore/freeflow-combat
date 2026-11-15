@@ -87,6 +87,12 @@ public class CombatState {
 
 	// --- Evade ---
 	public long evadeCooldownUntil = 0;
+	/** Projectiles miss until this tick (rolling). */
+	public long projectileDodgeUntil = 0;
+	// --- Slide ---
+	public long slideUntil = -1;
+	public long slideCooldownUntil = 0;
+	public final java.util.Set<Integer> slideHit = new java.util.HashSet<>();
 	/** Enemy the last evade vaulted over (null = plain evade). */
 	@Nullable
 	public Mob lastVaultTarget;

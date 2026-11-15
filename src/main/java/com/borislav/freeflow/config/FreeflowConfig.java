@@ -101,17 +101,28 @@ public final class FreeflowConfig {
 
 	/** Dodge distance (blocks) and duration (ticks). */
 	public static double evadeDistance = 4.0;
-	public static int evadeTicks = 5;
+	public static int evadeTicks = 7;
 	/** Invulnerability after starting an evade or vault. */
 	public static int evadeIframeTicks = 8;
-	public static int evadeCooldownTicks = 12;
+	/** 0 = rolls chain back to back, like the Arkham games. */
+	public static int evadeCooldownTicks = 0;
+	/** Arrows and other projectiles miss for this long after starting a roll. */
+	public static int rollProjectileDodgeTicks = 14;
 	/** Evading toward an enemy this close (and within the cone) vaults over it instead. */
-	public static double vaultRange = 4.0;
-	public static double vaultCone = 35.0;
+	public static double vaultRange = 5.0;
+	public static double vaultCone = 50.0;
 	/** How far past the enemy the vault lands. */
 	public static double vaultLandBehind = 1.8;
 	public static int vaultTicks = 7;
 	/** Double-tapping a movement key evades in that direction (client). */
+	// Slide (tap sprint while running)
+	public static int slideTicks = 10;
+	public static double slideDistance = 6.5;
+	public static int slideCooldownTicks = 6;
+	public static int slideIframeTicks = 6;
+	public static double slideTripRadius = 0.9;
+	public static float slideDamage = 2.0f;
+	public static int slideKnockdownTicks = 40;
 	public static boolean doubleTapEvade = true;
 	public static int doubleTapWindowTicks = 6;
 

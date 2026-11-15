@@ -13,7 +13,7 @@ public class FightStats {
 	/** Distinct kinds of moves, for the variety multiplier. */
 	public enum MoveType {
 		STRIKE, FLYING, BEATDOWN, FINISHER, COUNTER, COUNTER_KICK, COUNTER_THROW, DEFLECT, STUN, EVADE, VAULT,
-		GROUND_TAKEDOWN, SPECIAL_TAKEDOWN
+		GROUND_TAKEDOWN, SPECIAL_TAKEDOWN, SLIDE
 	}
 
 	public static final int POINTS_HIT = 10;

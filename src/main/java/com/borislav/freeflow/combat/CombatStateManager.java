@@ -8,6 +8,7 @@ import com.borislav.freeflow.network.CombatInputPayload;
 import com.borislav.freeflow.network.CombatSyncPayload;
 import com.borislav.freeflow.network.FightSummaryPayload;
 import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.projectile.Projectile;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
@@ -42,7 +43,14 @@ public final class CombatStateManager {
 		ServerLivingEntityEvents.ALLOW_DAMAGE.register((entity, source, amount) -> {
 			if (entity instanceof ServerPlayer player) {
 				CombatState state = STATES.get(player.getUUID());
-				return state == null || player.level().getGameTime() >= state.invulnerableUntil;
+				if (state == null) {
+					return true;
+				}
+				long now = player.level().getGameTime();
+				if (source.getDirectEntity() instanceof Projectile && now < state.projectileDodgeUntil) {
+					return false; // rolled out of the line of fire
+				}
+				return now >= state.invulnerableUntil;
 			}
 			return true;
 		});

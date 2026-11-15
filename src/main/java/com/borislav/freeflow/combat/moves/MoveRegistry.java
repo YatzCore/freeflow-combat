@@ -20,6 +20,7 @@ public final class MoveRegistry {
 		register(CombatAction.STUN, new StunMove());
 		register(CombatAction.GROUND_TAKEDOWN, new GroundTakedownMove());
 		register(CombatAction.SPECIAL_TAKEDOWN, new SpecialTakedownMove());
+		register(CombatAction.SLIDE, new SlideMove());
 	}
 
 	public static void register(CombatAction action, Move move) {

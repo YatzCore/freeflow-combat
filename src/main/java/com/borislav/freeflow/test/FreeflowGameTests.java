@@ -437,13 +437,53 @@ public class FreeflowGameTests implements FabricGameTest {
 	}
 
 	@GameTest(template = EMPTY_STRUCTURE)
-	public void evadeHasCooldown(GameTestHelper h) {
+	public void rollsChainWithoutCooldown(GameTestHelper h) {
 		ServerPlayer p = player(h, CombatMode.FORCED_ON);
 		CombatState state = CombatStateManager.get(p);
 		evade(p, 0, 1.0f);
 		int acked = state.acceptedInputs;
 		evade(p, 0, -1.0f);
-		h.assertTrue(state.acceptedInputs == acked, "a second evade during the cooldown should be ignored");
+		h.assertTrue(state.acceptedInputs == acked + 1, "rolls chain back to back with no cooldown");
+		h.succeed();
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE, timeoutTicks = 40)
+	public void rollingDodgesArrows(GameTestHelper h) {
+		ServerPlayer p = player(h, CombatMode.FORCED_ON);
+		Skeleton s = still(h.spawn(EntityType.SKELETON, 2.5f, 1, 7.5f), 180.0f);
+		var arrow = EntityType.ARROW.create(h.getLevel());
+		var arrowHit = p.damageSources().arrow(arrow, s);
+
+		evade(p, 0, 1.0f);
+		h.runAfterDelay(10, () -> { // past the general roll i-frames, still inside the arrow dodge
+			h.assertTrue(!ServerLivingEntityEvents.ALLOW_DAMAGE.invoker().allowDamage(p, arrowHit, 4.0f),
+					"arrows should miss a rolling player");
+			h.assertTrue(ServerLivingEntityEvents.ALLOW_DAMAGE.invoker().allowDamage(p, p.damageSources().mobAttack(s), 2.0f),
+					"the arrow dodge only covers projectiles");
+			h.runAfterDelay(10, () -> {
+				h.assertTrue(ServerLivingEntityEvents.ALLOW_DAMAGE.invoker().allowDamage(p, arrowHit, 4.0f),
+						"arrows hit again after the roll");
+				h.succeed();
+			});
+		});
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE)
+	public void slideTripsEnemies(GameTestHelper h) {
+		ServerPlayer p = player(h, CombatMode.FORCED_ON);
+		p.setOnGround(true);
+		Zombie z = zombie(h, 2.5, 3.5); // right in the slide's path
+		CombatState state = CombatStateManager.get(p);
+
+		act(p, CombatAction.SLIDE);
+		h.assertTrue(state.slideUntil < 0, "no slide unless running");
+
+		p.setSprinting(true);
+		act(p, CombatAction.SLIDE);
+		h.assertTrue(state.slideUntil > h.getLevel().getGameTime(), "sprint + slide should start a slide");
+		EnemySlot slot = state.enemies.get(z.getId());
+		h.assertTrue(slot != null && slot.isKnockedDown(h.getLevel().getGameTime()), "the slide trips the enemy");
+		h.assertTrue(state.combo == 1, "a slide trip adds to the combo");
 		h.succeed();
 	}
 
@@ -728,16 +768,17 @@ public class FreeflowGameTests implements FabricGameTest {
 	}
 
 	@GameTest(template = EMPTY_STRUCTURE)
-	public void counterDeflectsRangedShot(GameTestHelper h) {
+	public void rangedShotsCantBeCountered(GameTestHelper h) {
 		ServerPlayer p = player(h, CombatMode.FORCED_ON);
 		Skeleton s = still(h.spawn(EntityType.SKELETON, 2.5f, 1, 7.5f), 180.0f);
 		CombatState state = CombatStateManager.get(p);
 
-		CombatDirector.requestRangedAttack(p, s); // 5 blocks away: outside melee counter range
+		CombatDirector.requestRangedAttack(p, s);
 		counter(p);
 		EnemySlot slot = state.enemies.get(s.getId());
-		h.assertTrue(!slot.isTelegraphing(), "counter should deflect a ranged shot at any distance");
-		h.assertTrue(state.combo == 1, "a deflect counts toward the combo");
+		h.assertTrue(slot.isTelegraphing(), "you can't counter a shot: evade it");
+		h.assertTrue(state.combo == 0, "a failed counter adds nothing");
+		h.assertTrue(state.counterCooldownUntil > h.getLevel().getGameTime(), "failed counter locks out briefly");
 		h.succeed();
 	}
 

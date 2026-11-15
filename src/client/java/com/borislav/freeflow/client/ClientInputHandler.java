@@ -61,6 +61,19 @@ public final class ClientInputHandler {
 			}
 		}
 		checkDoubleTap(client, active);
+		checkSlide(client, active);
+	}
+
+	// --- Slide: tap the sprint key (Ctrl) while already running ---
+
+	private static boolean sprintWasDown = false;
+
+	private static void checkSlide(Minecraft client, boolean active) {
+		boolean down = client.options.keySprint.isDown();
+		if (down && !sprintWasDown && active && client.player.isSprinting() && client.player.onGround()) {
+			send(CombatAction.SLIDE);
+		}
+		sprintWasDown = down;
 	}
 
 	// --- Double-tap a movement key to evade in that direction ---

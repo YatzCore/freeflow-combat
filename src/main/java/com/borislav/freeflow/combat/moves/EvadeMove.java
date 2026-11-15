@@ -44,9 +44,15 @@ public class EvadeMove implements Move {
 		state.nextStrikeTick = now + 2;
 
 		state.invulnerableUntil = Math.max(state.invulnerableUntil, now + FreeflowConfig.evadeIframeTicks);
+		state.projectileDodgeUntil = now + FreeflowConfig.rollProjectileDodgeTicks; // arrows miss a rolling target
 		state.evadeCooldownUntil = now + FreeflowConfig.evadeCooldownTicks;
 		state.lastVaultTarget = vaultTarget;
-		Anim.play(player, vaultTarget != null ? Anim.VAULT : Anim.EVADE);
+		int mode = vaultTarget != null ? EvadePayload.VAULT : directional ? EvadePayload.ROLL : EvadePayload.BACKFLIP;
+		Anim.play(player, switch (mode) {
+			case EvadePayload.VAULT -> Anim.VAULT;
+			case EvadePayload.ROLL -> Anim.ROLL;
+			default -> Anim.EVADE;
+		});
 		state.fight.record(vaultTarget != null ? FightStats.MoveType.VAULT : FightStats.MoveType.EVADE);
 
 		float distance;
@@ -69,7 +75,7 @@ public class EvadeMove implements Move {
 
 		if (ServerPlayNetworking.canSend(player, EvadePayload.TYPE)) {
 			ServerPlayNetworking.send(player,
-					new EvadePayload(yaw, distance, ticks, vaultTarget != null ? vaultTarget.getId() : -1));
+					new EvadePayload(yaw, distance, ticks, vaultTarget != null ? vaultTarget.getId() : -1, mode));
 		}
 		return true;
 	}

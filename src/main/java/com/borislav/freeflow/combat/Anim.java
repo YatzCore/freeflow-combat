@@ -39,13 +39,17 @@ public final class Anim {
 	public static final String COUNTER_THROW = "counter_throw";
 	public static final String STUN = "stun";
 	public static final String EVADE = "evade";
+	public static final String ROLL = "roll";
+	public static final String SLIDE = "slide";
+	/** Client-only looping run animation. */
+	public static final String RUN = "run";
 	public static final String VAULT = "vault";
 	public static final String GROUND_TAKEDOWN = "ground_takedown";
 	public static final String SPECIAL_TAKEDOWN = "special_takedown";
 
 	public static final List<String> ALL = List.of(JAB_RIGHT, JAB_LEFT, HOOK_RIGHT, HOOK_LEFT, ELBOW, KNEE, FRONT_KICK,
 			ROUNDHOUSE, SPIN_BACKFIST, HAYMAKER, FLYING_KICK, FLYING_KNEE, BEATDOWN_RIGHT, BEATDOWN_LEFT, FINISHER,
-			COUNTER, COUNTER_KICK, COUNTER_THROW, STUN, EVADE, VAULT, GROUND_TAKEDOWN, SPECIAL_TAKEDOWN);
+			COUNTER, COUNTER_KICK, COUNTER_THROW, STUN, EVADE, ROLL, VAULT, SLIDE, RUN, GROUND_TAKEDOWN, SPECIAL_TAKEDOWN);
 
 	/** Combo strings: the flow gets flashier as the combo grows. */
 	private static final List<String> TIER_LOW = List.of(JAB_RIGHT, JAB_LEFT, HOOK_RIGHT, FRONT_KICK);

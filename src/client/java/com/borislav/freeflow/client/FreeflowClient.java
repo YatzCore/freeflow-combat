@@ -56,6 +56,7 @@ public class FreeflowClient implements ClientModInitializer {
 			CinematicShots.tick();
 			TargetIndicator.tick(client);
 			MobAnimator.tick(client);
+			CombatAnimations.tickRun(client);
 		});
 		HudRenderCallback.EVENT.register(ComboHud::render);
 		HudRenderCallback.EVENT.register(FightSummaryHud::render);

@@ -9,7 +9,8 @@ public enum CombatAction {
 	STUN,
 	GROUND_TAKEDOWN,
 	SPECIAL_TAKEDOWN,
-	TOGGLE_MODE;
+	TOGGLE_MODE,
+	SLIDE;
 
 	/** Actions that only make sense while freeflow is active. */
 	public boolean requiresFreeflow() {

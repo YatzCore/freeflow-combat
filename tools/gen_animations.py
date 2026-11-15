@@ -5,10 +5,13 @@ Generates src/main/resources/assets/freeflow/player_animations/freeflow_combat.j
 Edit the keyframe tables below and re-run:
     python tools/gen_animations.py
 
-Conventions (playerAnimator):
-  - bones: head, torso, right_arm, left_arm, right_leg, left_leg, and "body" (the whole player)
-  - rotation in degrees [x, y, z]; arms/legs: negative x swings forward/up
-  - body position in pixels (1/16 block); y up
+Conventions used in the tables below (checked against playerAnimator's loader and renderer):
+  - bones: head, torso, right_arm, left_arm, right_leg, left_leg, and "body" (the whole player,
+    pivoting 0.7 blocks above the feet)
+  - rotation in degrees [x, y, z]; arms/legs: negative x swings forward/up; torso: positive x leans forward
+  - body rotation: positive x pitches the whole player FORWARD (a front flip is +360)
+  - body position in pixels (1/16 block): y up, z FORWARD (the generator converts: in the
+    file format +z is backward)
 """
 import json
 import os
@@ -25,10 +28,14 @@ def kf(frames):
     return {f"{t:g}": {"vector": v} for t, v in frames}
 
 
-def anim(length, **bones):
-    out = {"loop": False, "animation_length": length, "bones": {}}
+def anim(length, loop=False, **bones):
+    out = {"loop": loop, "animation_length": length, "bones": {}}
     for bone, channels in bones.items():
-        out["bones"][bone] = {ch: kf(fr) for ch, fr in channels.items()}
+        out["bones"][bone] = {}
+        for ch, fr in channels.items():
+            if bone == "body" and ch == "position":
+                fr = [(t, [v[0], v[1], -v[2]]) for t, v in fr]  # tables use z = forward
+            out["bones"][bone][ch] = kf(fr)
     return out
 
 
@@ -216,46 +223,93 @@ A["stun"] = anim(
     body={"rotation": [(0, Z), (0.25, [0, -40, 0]), (0.4, Z)]},
 )
 
+# Back-hop when evading with no direction held: a quick backflip.
 A["evade"] = anim(
-    0.32,
-    body={"position": [(0, Z), (0.08, [0, -5, 0]), (0.24, [0, -4, 0]), (0.32, Z)],
-          "rotation": [(0, Z), (0.08, [0, 0, 20]), (0.24, [0, 0, 15]), (0.32, Z)]},
-    torso={"rotation": [(0, Z), (0.08, [35, 0, 0]), (0.32, Z)]},
-    right_leg={"rotation": [(0, Z), (0.08, [-60, 0, 10]), (0.32, Z)]},
-    left_leg={"rotation": [(0, Z), (0.08, [30, 0, -10]), (0.32, Z)]},
-    right_arm={"rotation": [(0, Z), (0.08, [-60, 0, 50]), (0.32, Z)]},
-    left_arm={"rotation": [(0, Z), (0.08, [-60, 0, -50]), (0.32, Z)]},
+    0.4,
+    body={"rotation": [(0, Z), (0.05, [-20, 0, 0]), (0.32, [-360, 0, 0]), (0.4, [-360, 0, 0])],
+          "position": [(0, Z), (0.16, [0, 9, -2]), (0.32, [0, 2, -3]), (0.4, Z)]},
+    right_leg={"rotation": [(0, Z), (0.08, [-100, 0, 0]), (0.28, [-100, 0, 0]), (0.4, Z)]},
+    left_leg={"rotation": [(0, Z), (0.08, [-100, 0, 0]), (0.28, [-100, 0, 0]), (0.4, Z)]},
+    right_arm={"rotation": [(0, Z), (0.08, [-170, 0, 20]), (0.32, [-60, 0, 20]), (0.4, Z)]},
+    left_arm={"rotation": [(0, Z), (0.08, [-170, 0, -20]), (0.32, [-60, 0, -20]), (0.4, Z)]},
 )
 
+# Combat roll: the player is turned to face the roll direction, then tucks and rolls forward.
+A["roll"] = anim(
+    0.4,
+    body={"rotation": [(0, Z), (0.04, [15, 0, 0]), (0.33, [360, 0, 0]), (0.4, [360, 0, 0])],
+          "position": [(0, Z), (0.05, [0, -6, 1]), (0.18, [0, -11, 2]), (0.33, [0, -6, 2]), (0.4, Z)]},
+    torso={"rotation": [(0, Z), (0.06, [35, 0, 0]), (0.3, [35, 0, 0]), (0.4, Z)]},
+    head={"rotation": [(0, Z), (0.06, [40, 0, 0]), (0.3, [40, 0, 0]), (0.4, Z)]},
+    right_leg={"rotation": [(0, Z), (0.06, [-115, 0, 0]), (0.3, [-115, 0, 0]), (0.4, Z)]},
+    left_leg={"rotation": [(0, Z), (0.06, [-115, 0, 0]), (0.3, [-115, 0, 0]), (0.4, Z)]},
+    right_arm={"rotation": [(0, Z), (0.06, [-150, 0, 15]), (0.3, [-150, 0, 15]), (0.4, Z)]},
+    left_arm={"rotation": [(0, Z), (0.06, [-150, 0, -15]), (0.3, [-150, 0, -15]), (0.4, Z)]},
+)
+
+# Rolling into an enemy: a high front flip over it.
 A["vault"] = anim(
-    0.36,
-    body={"rotation": [(0, Z), (0.36, [-360, 0, 0])], "position": [(0, Z), (0.18, [0, 8, 0]), (0.36, Z)]},
-    right_leg={"rotation": [(0, Z), (0.08, [-110, 0, 0]), (0.28, [-110, 0, 0]), (0.36, Z)]},
-    left_leg={"rotation": [(0, Z), (0.08, [-110, 0, 0]), (0.28, [-110, 0, 0]), (0.36, Z)]},
-    right_arm={"rotation": [(0, Z), (0.08, [-170, 0, 25]), (0.36, Z)]},
-    left_arm={"rotation": [(0, Z), (0.08, [-170, 0, -25]), (0.36, Z)]},
+    0.42,
+    body={"rotation": [(0, Z), (0.06, [-15, 0, 0]), (0.36, [360, 0, 0]), (0.42, [360, 0, 0])],
+          "position": [(0, Z), (0.1, [0, 8, 1]), (0.2, [0, 13, 3]), (0.32, [0, 6, 3]), (0.42, Z)]},
+    right_leg={"rotation": [(0, Z), (0.1, [-115, 0, 0]), (0.3, [-115, 0, 0]), (0.42, Z)]},
+    left_leg={"rotation": [(0, Z), (0.1, [-115, 0, 0]), (0.3, [-115, 0, 0]), (0.42, Z)]},
+    right_arm={"rotation": [(0, Z), (0.06, [-175, 0, 20]), (0.3, [-120, 0, 30]), (0.42, Z)]},
+    left_arm={"rotation": [(0, Z), (0.06, [-175, 0, -20]), (0.3, [-120, 0, -30]), (0.42, Z)]},
+    torso={"rotation": [(0, Z), (0.1, [30, 0, 0]), (0.3, [30, 0, 0]), (0.42, Z)]},
 )
 
+# Drop onto the downed enemy: lean over it, knee down (rear leg back), one hand pinning it,
+# three hammer blows with the other.
 A["ground_takedown"] = anim(
     1.0,
-    body={"position": [(0, Z), (0.12, [0, -7, 0]), (0.88, [0, -7, 0]), (1.0, Z)]},
-    right_leg={"rotation": [(0, Z), (0.12, [-95, 0, 0]), (0.88, [-95, 0, 0]), (1.0, Z)]},
-    left_leg={"rotation": [(0, Z), (0.12, [15, 0, 0]), (0.88, [15, 0, 0]), (1.0, Z)]},
-    torso={"rotation": [(0, Z), (0.12, [40, 0, 0]), (0.88, [40, 0, 0]), (1.0, Z)]},
-    right_arm={"rotation": [(0, Z), (0.2, [-175, 0, 0]), (0.28, [-40, 0, 0]), (0.45, [-175, 0, 0]), (0.53, [-40, 0, 0]),
-                            (0.75, [-180, 0, 0]), (0.83, [-20, 0, 0]), (1.0, Z)]},
-    left_arm={"rotation": [(0, Z), (0.12, [-70, 0, -25]), (0.88, [-70, 0, -25]), (1.0, Z)]},
+    body={"position": [(0, Z), (0.12, [0, -4, 3]), (0.88, [0, -4, 3]), (1.0, Z)],
+          "rotation": [(0, Z), (0.12, [22, 0, 0]), (0.88, [22, 0, 0]), (1.0, Z)]},
+    torso={"rotation": [(0, Z), (0.12, [30, 0, 0]), (0.88, [30, 0, 0]), (1.0, Z)]},
+    right_leg={"rotation": [(0, Z), (0.12, [-45, 0, 5]), (0.88, [-45, 0, 5]), (1.0, Z)]},
+    left_leg={"rotation": [(0, Z), (0.12, [55, 0, -5]), (0.88, [55, 0, -5]), (1.0, Z)]},
+    left_arm={"rotation": [(0, Z), (0.12, [-75, 0, -10]), (0.88, [-75, 0, -10]), (1.0, Z)]},
+    right_arm={"rotation": [(0, Z), (0.18, [-165, 0, 10]), (0.27, [-55, 0, 0]), (0.42, [-165, 0, 10]), (0.51, [-55, 0, 0]),
+                            (0.68, [-175, 0, 10]), (0.78, [-45, 0, 0]), (0.9, [-60, 0, 0]), (1.0, Z)]},
+    head={"rotation": [(0, Z), (0.12, [25, 0, 0]), (0.88, [25, 0, 0]), (1.0, Z)]},
 )
 
+# Leap into a spinning hook kick.
 A["special_takedown"] = anim(
     0.55,
-    body={"rotation": [(0, Z), (0.35, [0, 360, 0]), (0.55, [0, 360, 0])],
-          "position": [(0, Z), (0.15, [0, 6, 0]), (0.35, [0, 5, 0]), (0.55, Z)]},
-    right_leg={"rotation": [(0, Z), (0.15, [-40, 0, 40]), (0.3, [-95, 0, 35]), (0.42, [-90, 0, 30]), (0.55, Z)]},
-    left_leg={"rotation": [(0, Z), (0.15, [-60, 0, 0]), (0.55, Z)]},
-    right_arm={"rotation": [(0, Z), (0.2, [-30, 0, 100]), (0.55, Z)]},
-    left_arm={"rotation": [(0, Z), (0.2, [-30, 0, -100]), (0.55, Z)]},
-    torso={"rotation": [(0, Z), (0.3, [-15, 0, 0]), (0.55, Z)]},
+    body={"rotation": [(0, Z), (0.08, [-8, 0, 0]), (0.36, [0, -360, 0]), (0.55, [0, -360, 0])],
+          "position": [(0, Z), (0.1, [0, 6, 1]), (0.28, [0, 7, 3]), (0.45, [0, 2, 3]), (0.55, Z)]},
+    right_leg={"rotation": [(0, Z), (0.12, [-40, 0, 25]), (0.26, [-75, 0, 70]), (0.38, [-65, 0, 55]), (0.55, Z)]},
+    left_leg={"rotation": [(0, Z), (0.12, [-85, 0, 0]), (0.36, [-60, 0, 0]), (0.55, Z)]},
+    right_arm={"rotation": [(0, Z), (0.15, [-20, 0, 80]), (0.4, [-30, 0, 60]), (0.55, Z)]},
+    left_arm={"rotation": [(0, Z), (0.15, [-60, 0, -80]), (0.4, [-50, 0, -60]), (0.55, Z)]},
+    torso={"rotation": [(0, Z), (0.26, [-10, 0, -15]), (0.55, Z)]},
+)
+
+# Feet-first slide: low, leaning back, legs out front, one arm back for balance.
+A["slide"] = anim(
+    0.5,
+    body={"rotation": [(0, Z), (0.08, [-55, 0, 0]), (0.42, [-50, 0, 0]), (0.5, Z)],
+          "position": [(0, Z), (0.08, [0, -10, 0]), (0.42, [0, -10, 0]), (0.5, Z)]},
+    right_leg={"rotation": [(0, Z), (0.08, [-80, 0, 5]), (0.42, [-80, 0, 5]), (0.5, Z)]},
+    left_leg={"rotation": [(0, Z), (0.08, [-45, 0, -5]), (0.42, [-45, 0, -5]), (0.5, Z)]},
+    right_arm={"rotation": [(0, Z), (0.08, [40, 0, 35]), (0.42, [40, 0, 35]), (0.5, Z)]},
+    left_arm={"rotation": [(0, Z), (0.08, [-70, 0, -20]), (0.42, [-70, 0, -20]), (0.5, Z)]},
+    torso={"rotation": [(0, Z), (0.08, [-10, 0, 0]), (0.42, [-10, 0, 0]), (0.5, Z)]},
+    head={"rotation": [(0, Z), (0.08, [30, 0, 0]), (0.42, [30, 0, 0]), (0.5, Z)]},
+)
+
+# Combat run (looping): leaning forward, arms trailing back, long strides.
+A["run"] = anim(
+    0.5,
+    loop=True,
+    body={"rotation": [(0, [8, 0, 0]), (0.5, [8, 0, 0])]},
+    torso={"rotation": [(0, [18, 0, 0]), (0.5, [18, 0, 0])]},
+    head={"rotation": [(0, [-15, 0, 0]), (0.5, [-15, 0, 0])]},
+    right_arm={"rotation": [(0, [30, 0, 15]), (0.25, [55, 0, 15]), (0.5, [30, 0, 15])]},
+    left_arm={"rotation": [(0, [55, 0, -15]), (0.25, [30, 0, -15]), (0.5, [55, 0, -15])]},
+    right_leg={"rotation": [(0, [-55, 0, 0]), (0.25, [45, 0, 0]), (0.5, [-55, 0, 0])]},
+    left_leg={"rotation": [(0, [45, 0, 0]), (0.25, [-55, 0, 0]), (0.5, [45, 0, 0])]},
 )
 
 if __name__ == "__main__":
