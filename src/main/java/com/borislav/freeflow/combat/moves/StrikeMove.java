@@ -3,6 +3,7 @@ package com.borislav.freeflow.combat.moves;
 import com.borislav.freeflow.ai.CombatDirector;
 import com.borislav.freeflow.ai.EnemySlot;
 import com.borislav.freeflow.ai.EnemyStatus;
+import com.borislav.freeflow.combat.Anim;
 import com.borislav.freeflow.combat.CombatModeTracker;
 import com.borislav.freeflow.combat.CombatState;
 import com.borislav.freeflow.combat.ComboTracker;
@@ -127,9 +128,16 @@ public class StrikeMove implements Move {
 			state.strikeTarget = null;
 			state.nextStrikeTick = now + FreeflowConfig.whiffRecoveryTicks;
 			ComboTracker.breakCombo(player, state); // swinging at air breaks the flow
+			Anim.play(player, Anim.strike(state.strikeIndex));
 			send(player, -1, 0);
 			return;
 		}
+
+		EnemySlot targetSlot = state.enemies.get(target.getId());
+		boolean beatdown = !special && targetSlot != null && targetSlot.mob == target
+				&& now < targetSlot.stunnedUntil && !targetSlot.isKnockedDown(now);
+		Anim.play(player, special ? Anim.SPECIAL_TAKEDOWN
+				: beatdown ? Anim.beatdown(state.strikeIndex) : Anim.strike(state.strikeIndex));
 
 		double dist = Directions.horizontalDistance(player, target);
 		double stop = stopDistance(target);
@@ -212,6 +220,7 @@ public class StrikeMove implements Move {
 			if (++slot.beatdownHits >= FreeflowConfig.beatdownFinisherHits && target.isAlive()) {
 				target.knockback(FreeflowConfig.finisherKnockback, player.getX() - target.getX(), player.getZ() - target.getZ());
 				EnemyStatus.knockDown(player, state, target, FreeflowConfig.knockdownTicks);
+				Anim.play(player, Anim.FINISHER);
 				level.playSound(null, target.getX(), target.getY(), target.getZ(), SoundEvents.PLAYER_ATTACK_KNOCKBACK,
 						SoundSource.PLAYERS, 1.2f, 0.7f);
 				recovery = ComboTracker.recoveryTicks(state) + 2;

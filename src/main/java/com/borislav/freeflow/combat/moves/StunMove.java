@@ -1,6 +1,7 @@
 package com.borislav.freeflow.combat.moves;
 
 import com.borislav.freeflow.ai.EnemyStatus;
+import com.borislav.freeflow.combat.Anim;
 import com.borislav.freeflow.combat.CombatState;
 import com.borislav.freeflow.combat.TargetSelector;
 import com.borislav.freeflow.config.FreeflowConfig;
@@ -34,6 +35,7 @@ public class StunMove implements Move {
 		}
 
 		EnemyStatus.stun(player, state, target, FreeflowConfig.stunTicks);
+		Anim.play(player, Anim.STUN);
 		state.lastStrikeMob = target;
 		state.stunCooldownUntil = now + FreeflowConfig.stunCooldownTicks;
 		if (state.combo > 0) {

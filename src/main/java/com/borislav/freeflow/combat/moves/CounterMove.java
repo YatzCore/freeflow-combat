@@ -5,6 +5,7 @@ import com.borislav.freeflow.ai.EnemyStatus;
 import com.borislav.freeflow.network.CombatEventPayload;
 import com.borislav.freeflow.network.TelegraphPayload;
 import com.borislav.freeflow.ai.EnemySlot;
+import com.borislav.freeflow.combat.Anim;
 import com.borislav.freeflow.combat.CombatState;
 import com.borislav.freeflow.combat.ComboTracker;
 import com.borislav.freeflow.config.FreeflowConfig;
@@ -67,6 +68,7 @@ public class CounterMove implements Move {
 
 		if (target.ranged) {
 			deflect(player, state, target, now);
+			Anim.play(player, Anim.COUNTER);
 			send(player, List.of(target.mob.getId()));
 			return true;
 		}
@@ -79,6 +81,7 @@ public class CounterMove implements Move {
 		state.nextStrikeTick = now + 4;
 
 		counter(player, state, target, now);
+		Anim.play(player, Anim.COUNTER);
 		player.swing(InteractionHand.MAIN_HAND, true);
 		send(player, List.of(target.mob.getId()));
 		return true;

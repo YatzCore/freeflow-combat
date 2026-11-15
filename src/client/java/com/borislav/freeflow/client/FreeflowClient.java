@@ -1,7 +1,9 @@
 package com.borislav.freeflow.client;
 
 import com.borislav.freeflow.FreeflowMod;
+import com.borislav.freeflow.client.anim.CombatAnimations;
 import com.borislav.freeflow.client.camera.CinematicShots;
+import com.borislav.freeflow.network.AnimationPayload;
 import com.borislav.freeflow.client.camera.CombatFraming;
 import com.borislav.freeflow.client.camera.FreeflowCamera;
 import com.borislav.freeflow.client.hud.TargetIndicator;
@@ -32,6 +34,9 @@ public class FreeflowClient implements ClientModInitializer {
 		FreeflowMod.LOGGER.info("Freeflow Combat client initializing");
 
 		Keybinds.register();
+		CombatAnimations.init();
+		ClientPlayNetworking.registerGlobalReceiver(AnimationPayload.TYPE,
+				(payload, context) -> CombatAnimations.onAnimation(payload));
 		ClientTickEvents.START_CLIENT_TICK.register(client -> {
 			ClientCombo.tick();
 			LungeController.tick(client);

@@ -801,6 +801,29 @@ public class FreeflowGameTests implements FabricGameTest {
 		});
 	}
 
+	// --- Milestone 11: animations ---
+
+	/** Every animation the server can trigger must exist in the animation file and parse. */
+	@GameTest(template = EMPTY_STRUCTURE)
+	public void combatAnimationsParse(GameTestHelper h) {
+		String path = "/assets/freeflow/player_animations/freeflow_combat.json";
+		try (var in = FreeflowGameTests.class.getResourceAsStream(path)) {
+			h.assertTrue(in != null, "animation file missing: " + path);
+			var json = com.google.gson.JsonParser.parseReader(
+					new java.io.InputStreamReader(in, java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
+			var animations = dev.kosmx.playerAnim.core.data.gson.GeckoLibSerializer.deserialize(json);
+			java.util.Map<String, Integer> lengths = new java.util.HashMap<>();
+			animations.forEach(a -> lengths.put(a.getName(), a.getLength()));
+			for (String name : com.borislav.freeflow.combat.Anim.ALL) {
+				h.assertTrue(lengths.containsKey(name), "animation not found or failed to parse: " + name);
+				h.assertTrue(lengths.get(name) > 0, "animation has no length: " + name);
+			}
+		} catch (java.io.IOException e) {
+			h.fail("could not read animations: " + e);
+		}
+		h.succeed();
+	}
+
 	private static void counter(ServerPlayer p) {
 		CombatStateManager.handleInput(p, new CombatInputPayload(CombatAction.COUNTER, 0, 0, FACING_PLUS_Z));
 	}
