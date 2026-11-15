@@ -200,6 +200,10 @@ public class StrikeMove implements Move {
 		}
 		player.setLastHurtMob(target);
 		player.causeFoodExhaustion(0.1f);
+		if (!target.isAlive() && isLastEnemy(player, target)) {
+			state.lastFinalHitTick = now;
+			EnemyStatus.event(player, CombatEventPayload.Type.FINAL_HIT, target, 0);
+		}
 
 		int recovery = ComboTracker.recoveryTicks(state);
 		if (beatdown) {
@@ -222,6 +226,16 @@ public class StrikeMove implements Move {
 		level.sendParticles(ParticleTypes.CRIT, target.getX(), target.getY(0.6), target.getZ(), beatdown ? 4 : 8,
 				0.25, 0.25, 0.25, 0.2);
 		return recovery;
+	}
+
+	/** True if no other living enemy within combat range is still fighting the player. */
+	private static boolean isLastEnemy(ServerPlayer player, Mob killed) {
+		for (Mob mob : CombatModeTracker.findEngagedMobs(player)) {
+			if (mob != killed && mob.isAlive()) {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	public static double stopDistance(Mob target) {

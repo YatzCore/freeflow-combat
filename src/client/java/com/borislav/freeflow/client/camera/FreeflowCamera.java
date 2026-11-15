@@ -57,6 +57,11 @@ public final class FreeflowCamera {
 		return shoulderSide;
 	}
 
+	/** Programmatic camera turn (auto-framing). */
+	public static void addYaw(float degrees) {
+		yaw += degrees;
+	}
+
 	public static void swapShoulder() {
 		shoulderSide = -shoulderSide;
 	}
@@ -108,6 +113,9 @@ public final class FreeflowCamera {
 
 	/** Mouse look, routed here instead of rotating the player. Same scale as vanilla Entity.turn. */
 	public static void turn(double dYaw, double dPitch) {
+		if (Math.abs(dYaw) + Math.abs(dPitch) > 0.5) {
+			CombatFraming.onMouseTurn();
+		}
 		yaw += (float) dYaw * 0.15f;
 		pitch = Mth.clamp(pitch + (float) dPitch * 0.15f, -89.0f, 89.0f);
 	}
@@ -119,6 +127,13 @@ public final class FreeflowCamera {
 		lastFrameNanos = now;
 
 		Vec3 eye = entity.getEyePosition(partialTick);
+		// Lean toward the enemies' centre, but never through a wall.
+		Vec3 shift = CombatFraming.shift();
+		double shiftLen = shift.length();
+		if (shiftLen > 0.05) {
+			double clear = CameraCollision.maxDistance(level, entity, eye, eye.add(shift));
+			eye = eye.add(shift.scale(Math.min(1.0, clear / shiftLen)));
+		}
 		if (smoothedPivot == null || smoothedPivot.distanceToSqr(eye) > 64.0) {
 			smoothedPivot = eye; // first frame or teleport: snap
 		} else {
@@ -132,8 +147,8 @@ public final class FreeflowCamera {
 
 		Vec3 desired = smoothedPivot
 				.add(right.scale(FreeflowConfig.cameraShoulderOffset * smoothedSide))
-				.add(0.0, FreeflowConfig.cameraHeight, 0.0)
-				.subtract(forward.scale(FreeflowConfig.cameraDistance));
+				.add(0.0, FreeflowConfig.cameraHeight + CombatFraming.heightBonus(), 0.0)
+				.subtract(forward.scale(FreeflowConfig.cameraDistance + CombatFraming.distanceBonus()));
 
 		Vec3 offset = desired.subtract(smoothedPivot);
 		double fullLength = offset.length();

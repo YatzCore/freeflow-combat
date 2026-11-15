@@ -769,6 +769,38 @@ public class FreeflowGameTests implements FabricGameTest {
 		h.succeed();
 	}
 
+	// --- Milestone 10: final hit detection (drives the cinematic finisher) ---
+
+	@GameTest(template = EMPTY_STRUCTURE)
+	public void killingLastEnemyIsFinalHit(GameTestHelper h) {
+		ServerPlayer p = player(h, CombatMode.FORCED_ON);
+		Zombie z = zombie(h, 2.5, 4.0);
+		z.setHealth(1.0f);
+		z.setTarget(p);
+		CombatState state = CombatStateManager.get(p);
+
+		strike(p, FACING_PLUS_Z, 0, 0);
+		h.succeedWhen(() -> h.assertTrue(state.lastFinalHitTick >= 0, "killing the last enemy is the final hit"));
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE, timeoutTicks = 40)
+	public void killWithEnemiesLeftIsNotFinalHit(GameTestHelper h) {
+		ServerPlayer p = player(h, CombatMode.FORCED_ON);
+		Zombie z = zombie(h, 2.5, 4.0);
+		z.setHealth(1.0f);
+		z.setTarget(p);
+		Zombie other = zombie(h, 5.5, 6.5);
+		other.setTarget(p); // still fighting
+		CombatState state = CombatStateManager.get(p);
+
+		strike(p, FACING_PLUS_Z, 0, 0);
+		h.runAfterDelay(10, () -> {
+			h.assertTrue(!z.isAlive(), "the weak zombie should die");
+			h.assertTrue(state.lastFinalHitTick < 0, "not the final hit while another enemy is fighting");
+			h.succeed();
+		});
+	}
+
 	private static void counter(ServerPlayer p) {
 		CombatStateManager.handleInput(p, new CombatInputPayload(CombatAction.COUNTER, 0, 0, FACING_PLUS_Z));
 	}

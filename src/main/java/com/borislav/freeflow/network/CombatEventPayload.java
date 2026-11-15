@@ -18,7 +18,9 @@ public record CombatEventPayload(Type event, int mobId, int ticks) implements Cu
 		/** Counter deflected a ranged shot. */
 		DEFLECT,
 		/** Counter pressed but the only attacks coming are armed (uncounterable). */
-		CANT_COUNTER;
+		CANT_COUNTER,
+		/** A strike killed the last enemy fighting the player (cinematic finisher). */
+		FINAL_HIT;
 
 		static Type byId(int id) {
 			Type[] v = values();

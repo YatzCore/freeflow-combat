@@ -2,7 +2,7 @@ package com.borislav.freeflow.combat;
 
 import com.borislav.freeflow.ai.EnemyRole;
 import com.borislav.freeflow.config.FreeflowConfig;
-import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.monster.Enemy;
@@ -17,7 +17,7 @@ public final class TargetSelector {
 	private TargetSelector() {}
 
 	@Nullable
-	public static Mob select(ServerPlayer player, float aimYaw, float forward, float left, double range) {
+	public static Mob select(Player player, float aimYaw, float forward, float left, double range) {
 		boolean directional = forward * forward + left * left > 0.04f;
 		float desiredYaw = directional ? Directions.worldYaw(aimYaw, forward, left) : aimYaw;
 		double cone = directional ? FreeflowConfig.strikeConeDirectional : FreeflowConfig.strikeConeNeutral;
@@ -51,7 +51,7 @@ public final class TargetSelector {
 		return best;
 	}
 
-	public static boolean isValidTarget(ServerPlayer player, Mob mob) {
+	public static boolean isValidTarget(Player player, Mob mob) {
 		return mob.isAlive() && !mob.isRemoved() && !mob.isInvulnerable()
 				&& (mob instanceof Enemy || mob.getTarget() == player)
 				&& player.hasLineOfSight(mob);

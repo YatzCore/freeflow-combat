@@ -1,7 +1,10 @@
 package com.borislav.freeflow.client;
 
 import com.borislav.freeflow.FreeflowMod;
+import com.borislav.freeflow.client.camera.CinematicShots;
+import com.borislav.freeflow.client.camera.CombatFraming;
 import com.borislav.freeflow.client.camera.FreeflowCamera;
+import com.borislav.freeflow.client.hud.TargetIndicator;
 import com.borislav.freeflow.client.hud.ComboHud;
 import com.borislav.freeflow.client.hud.DebugOverlay;
 import com.borislav.freeflow.client.hud.StatusMarkers;
@@ -37,6 +40,9 @@ public class FreeflowClient implements ClientModInitializer {
 		ClientTickEvents.END_CLIENT_TICK.register(client -> {
 			ClientInputHandler.tick(client);
 			FreeflowCamera.tick(client);
+			CombatFraming.tick(client);
+			CinematicShots.tick();
+			TargetIndicator.tick(client);
 		});
 		HudRenderCallback.EVENT.register(ComboHud::render);
 		HudRenderCallback.EVENT.register(DebugOverlay::render);
@@ -61,13 +67,19 @@ public class FreeflowClient implements ClientModInitializer {
 		ClientPlayNetworking.registerGlobalReceiver(CombatEventPayload.TYPE, (payload, context) -> {
 			StatusMarkers.onEvent(payload);
 			ClientCombo.onEvent(payload);
-			if (payload.event() == CombatEventPayload.Type.STUN) {
-				LungeController.faceEntity(payload.mobId());
+			switch (payload.event()) {
+				case STUN -> LungeController.faceEntity(payload.mobId());
+				case TAKEDOWN, SPECIAL_TAKEDOWN, FINAL_HIT -> CinematicShots.start(payload.mobId());
+				default -> {}
 			}
 		});
 		WorldRenderEvents.AFTER_ENTITIES.register(TelegraphRenderer::render);
 		WorldRenderEvents.AFTER_ENTITIES.register(StatusMarkers::render);
+		WorldRenderEvents.AFTER_ENTITIES.register(TargetIndicator::render);
 		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
+			CinematicShots.reset();
+			CombatFraming.reset();
+			TargetIndicator.reset();
 			StatusMarkers.reset();
 			EvadeController.reset();
 			TelegraphRenderer.reset();

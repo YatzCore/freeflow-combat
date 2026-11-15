@@ -169,4 +169,37 @@ public final class FreeflowConfig {
 	public static double cameraZoomOutSharpness = 4.0;
 	/** Max degrees per tick the player body turns toward the movement direction. */
 	public static float cameraBodyTurnSpeed = 40.0f;
+
+	// --- Camera polish: combat framing (client) ---
+
+	/** Extra camera distance per nearby enemy beyond the first (4 -> ~7 blocks). */
+	public static double framingDistancePerEnemy = 0.6;
+	public static double framingHeightPerEnemy = 0.12;
+	/** Extra FOV degrees per enemy beyond the first. */
+	public static double framingFovPerEnemy = 1.5;
+	/** Enemy count at which framing stops widening. */
+	public static int framingMaxEnemies = 6;
+	/** Fraction of the way the camera pivot leans toward the enemies' centre (capped). */
+	public static double framingCentroidBias = 0.25;
+	public static double framingCentroidMaxShift = 2.0;
+	/** After this long without mouse movement, the camera slowly turns to keep enemies in view. */
+	public static int framingAutoYawDelayTicks = 30;
+	/** Enemies' centre may drift this far (degrees) off the camera's facing before it turns. */
+	public static double framingAutoYawThreshold = 50.0;
+	/** Max auto-turn speed, degrees per tick. */
+	public static float framingAutoYawSpeed = 2.0f;
+
+	// --- Camera polish: cinematics, target indicator ---
+
+	public static boolean cinematicShots = true;
+	/** Real slow motion during cinematic shots (singleplayer only: it changes the server tick rate). */
+	public static boolean cinematicSlowMo = true;
+	public static float cinematicSlowMoTickRate = 8.0f;
+	/** Cinematic shot length and how much of it is in slow motion (client ticks). */
+	public static int cinematicTicks = 16;
+	public static int cinematicSlowMoTicks = 8;
+	/** Show a marker on the enemy your next strike would snap to. */
+	public static boolean targetIndicator = true;
+	/** Hide the player model when the camera is pushed closer than this (blocks). */
+	public static double hidePlayerDistance = 0.9;
 }

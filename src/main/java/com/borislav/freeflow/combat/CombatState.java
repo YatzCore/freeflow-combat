@@ -68,6 +68,9 @@ public class CombatState {
 	public Mob takedownTarget;
 	public long takedownEndTick = -1;
 
+	/** Game tick of the last fight-ending hit (cinematic finisher). */
+	public long lastFinalHitTick = -1;
+
 	// --- Evade ---
 	public long evadeCooldownUntil = 0;
 	/** Enemy the last evade vaulted over (null = plain evade). */
