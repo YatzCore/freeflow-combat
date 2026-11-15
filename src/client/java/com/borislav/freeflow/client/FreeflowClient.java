@@ -4,9 +4,13 @@ import com.borislav.freeflow.FreeflowMod;
 import com.borislav.freeflow.client.camera.FreeflowCamera;
 import com.borislav.freeflow.client.hud.ComboHud;
 import com.borislav.freeflow.client.hud.DebugOverlay;
+import com.borislav.freeflow.client.hud.TelegraphRenderer;
 import com.borislav.freeflow.network.ComboPayload;
 import com.borislav.freeflow.network.CombatSyncPayload;
+import com.borislav.freeflow.network.CounterPayload;
 import com.borislav.freeflow.network.StrikeStartPayload;
+import com.borislav.freeflow.network.TelegraphPayload;
+import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
@@ -41,7 +45,16 @@ public class FreeflowClient implements ClientModInitializer {
 		});
 		ClientPlayNetworking.registerGlobalReceiver(ComboPayload.TYPE,
 				(payload, context) -> ClientCombo.onCombo(payload));
+		ClientPlayNetworking.registerGlobalReceiver(TelegraphPayload.TYPE,
+				(payload, context) -> TelegraphRenderer.onTelegraph(payload));
+		ClientPlayNetworking.registerGlobalReceiver(CounterPayload.TYPE, (payload, context) -> {
+			payload.mobIds().forEach(TelegraphRenderer::clear);
+			LungeController.onCounter(payload.mobIds());
+			ClientCombo.onCounter(payload.mobIds().size());
+		});
+		WorldRenderEvents.AFTER_ENTITIES.register(TelegraphRenderer::render);
 		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
+			TelegraphRenderer.reset();
 			FreeflowCamera.exit(client);
 			LungeController.reset();
 			ClientCombatState.reset();

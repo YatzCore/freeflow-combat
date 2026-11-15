@@ -98,6 +98,15 @@ public final class ComboHud {
 	}
 
 	private static void renderFlash(GuiGraphics g, Font font, int w, int h, float pt) {
+		float sinceCounter = ClientCombo.clientTick - ClientCombo.lastCounterTick + pt;
+		if (sinceCounter < 15) {
+			int a = (int) (255 * Mth.clamp(1.0f - sinceCounter / 15.0f, 0f, 1f));
+			if (a >= 8) {
+				String s = ClientCombo.lastCounterCount > 1 ? "COUNTER x" + ClientCombo.lastCounterCount : "COUNTER";
+				g.drawString(font, s, w / 2 - font.width(s) / 2, h / 2 - 28, (a << 24) | 0x4FD8FF, true);
+			}
+		}
+
 		float since = ClientCombo.clientTick - ClientCombo.brokenAtTick + pt;
 		if (since > 25) {
 			return;

@@ -86,6 +86,21 @@ public final class LungeController {
 		player.setYBodyRot(yaw);
 	}
 
+	/** Counter: stop any lunge and turn to face the (first) countered enemy. */
+	public static void onCounter(java.util.List<Integer> mobIds) {
+		Minecraft mc = Minecraft.getInstance();
+		target = null;
+		ticksLeft = 0;
+		if (mc.level == null || mc.player == null || mobIds.isEmpty()) {
+			return;
+		}
+		Entity first = mc.level.getEntity(mobIds.get(0));
+		if (first != null) {
+			face(mc.player, first);
+			lastTargetName = first.getName().getString() + " (countered)";
+		}
+	}
+
 	public static void reset() {
 		target = null;
 		ticksLeft = 0;

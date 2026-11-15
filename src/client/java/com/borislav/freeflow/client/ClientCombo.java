@@ -30,6 +30,18 @@ public final class ClientCombo {
 	public static long strikeLandTick = -1;
 	public static long strikeStartTick = -1;
 
+	/** Last successful counter (for the "COUNTER" flash) and how many enemies it hit. */
+	public static long lastCounterTick = -1000;
+	public static int lastCounterCount = 0;
+
+	public static void onCounter(int count) {
+		if (count > 0) {
+			lastCounterTick = clientTick;
+			lastCounterCount = count;
+			strikeLandTick = -1;
+		}
+	}
+
 	public static void tick() {
 		clientTick++;
 	}

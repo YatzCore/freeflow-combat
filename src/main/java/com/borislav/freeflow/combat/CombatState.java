@@ -1,8 +1,12 @@
 package com.borislav.freeflow.combat;
 
+import com.borislav.freeflow.ai.EnemySlot;
 import com.borislav.freeflow.network.CombatInputPayload;
 import net.minecraft.world.entity.Mob;
 import org.jetbrains.annotations.Nullable;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Server-side combat state for one player. Later milestones add combo,
@@ -44,6 +48,12 @@ public class CombatState {
 	public int earlyPresses = 0;
 	/** Inputs are ignored until this game tick. */
 	public long staggerUntil = 0;
+
+	// --- Director & counter ---
+	/** Enemies fighting this player, by entity id. */
+	public final Map<Integer, EnemySlot> enemies = new HashMap<>();
+	public long lastTelegraphTick = -100;
+	public long counterCooldownUntil = 0;
 
 	/** Cancels everything in flight (combat ended, mode changed, death...). */
 	public void clearMoves() {

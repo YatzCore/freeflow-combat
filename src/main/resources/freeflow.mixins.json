@@ -2,7 +2,9 @@
 	"required": true,
 	"package": "com.borislav.freeflow.mixin",
 	"compatibilityLevel": "JAVA_21",
-	"mixins": [],
+	"mixins": [
+		"MeleeAttackGoalMixin"
+	],
 	"injectors": {
 		"defaultRequire": 1
 	}

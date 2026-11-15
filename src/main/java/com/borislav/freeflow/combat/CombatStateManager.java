@@ -1,5 +1,6 @@
 package com.borislav.freeflow.combat;
 
+import com.borislav.freeflow.ai.CombatDirector;
 import com.borislav.freeflow.combat.moves.Move;
 import com.borislav.freeflow.combat.moves.MoveRegistry;
 import com.borislav.freeflow.network.CombatInputPayload;
@@ -9,6 +10,7 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.server.level.ServerPlayer;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -57,6 +59,12 @@ public final class CombatStateManager {
 		return STATES.computeIfAbsent(player.getUUID(), id -> new CombatState());
 	}
 
+	/** State if it exists, without creating one (cheap check for mob AI hooks). */
+	@Nullable
+	public static CombatState peek(ServerPlayer player) {
+		return STATES.get(player.getUUID());
+	}
+
 	private static void tickPlayer(ServerPlayer player) {
 		CombatState state = get(player);
 		CombatModeTracker.tick(player, state);
@@ -65,8 +73,10 @@ public final class CombatStateManager {
 			for (Move move : MoveRegistry.all()) {
 				move.tick(player, state);
 			}
+			CombatDirector.tick(player, state);
 		} else {
 			state.clearMoves();
+			CombatDirector.clear(player, state);
 			ComboTracker.breakCombo(player, state);
 			if (!state.inCombat) {
 				state.maxCombo = 0; // fight over

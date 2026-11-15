@@ -1,5 +1,7 @@
 package com.borislav.freeflow.test;
 
+import com.borislav.freeflow.ai.CombatDirector;
+import com.borislav.freeflow.ai.EnemySlot;
 import com.borislav.freeflow.combat.CombatAction;
 import com.borislav.freeflow.combat.CombatMode;
 import com.borislav.freeflow.combat.CombatModeTracker;
@@ -11,6 +13,7 @@ import net.fabricmc.fabric.api.gametest.v1.FabricGameTest;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.item.ItemStack;
@@ -265,6 +268,109 @@ public class FreeflowGameTests implements FabricGameTest {
 
 		ServerLivingEntityEvents.AFTER_DAMAGE.invoker().afterDamage(p, p.damageSources().generic(), 2.0f, 2.0f, false);
 		h.assertTrue(state.combo == 0, "getting hit should break the combo");
+		h.succeed();
+	}
+
+	// --- Milestone 6: combat director & counter ---
+	// Mock players count as creative, so mobs won't target them on their own:
+	// these tests drive the director directly (the AI hook calls the same methods).
+
+	@GameTest(template = EMPTY_STRUCTURE)
+	public void directorOnlyAppliesInFreeflow(GameTestHelper h) {
+		ServerPlayer on = player(h, CombatMode.FORCED_ON);
+		h.assertTrue(CombatDirector.isDirected(on), "freeflow player should be directed");
+		CombatStateManager.get(on).mode = CombatMode.OFF;
+		CombatModeTracker.tick(on, CombatStateManager.get(on));
+		h.assertTrue(!CombatDirector.isDirected(on), "with combat OFF mobs should fight vanilla-style");
+		h.succeed();
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE)
+	public void telegraphedAttackLandsAfterWarning(GameTestHelper h) {
+		ServerPlayer p = player(h, CombatMode.FORCED_ON);
+		Zombie z = zombie(h, 2.5, 3.5);
+		CombatState state = CombatStateManager.get(p);
+
+		h.assertTrue(CombatDirector.requestAttack(p, z), "first attacker should get a turn");
+		EnemySlot slot = state.enemies.get(z.getId());
+		h.assertTrue(slot.isTelegraphing(), "attack should be telegraphed first");
+		h.assertTrue(!z.swinging, "zombie must not hit before the warning ends");
+		h.succeedWhen(() -> {
+			h.assertTrue(!slot.isTelegraphing(), "attack should resolve after the warning");
+			h.assertTrue(z.swinging, "zombie should swing when the attack lands");
+		});
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE)
+	public void directorLimitsSimultaneousAttackers(GameTestHelper h) {
+		ServerPlayer p = player(h, CombatMode.FORCED_ON);
+		Zombie a = zombie(h, 2.5, 3.5);
+		Zombie b = zombie(h, 3.5, 2.5);
+		Zombie c = zombie(h, 1.5, 2.5);
+		CombatState state = CombatStateManager.get(p);
+
+		h.assertTrue(CombatDirector.requestAttack(p, a), "A should get a turn");
+		h.assertTrue(!CombatDirector.requestAttack(p, b), "B must wait for the gap between attacks");
+		h.runAfterDelay(6, () -> {
+			h.assertTrue(CombatDirector.requestAttack(p, b), "B should get a turn after the gap");
+			h.runAfterDelay(4, () -> {
+				h.assertTrue(CombatDirector.activeAttacks(state) == 2, "two attacks should be in progress");
+				h.assertTrue(!CombatDirector.requestAttack(p, c), "C must wait: max 2 attackers at once");
+				h.succeed();
+			});
+		});
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE)
+	public void counterCancelsAttackAndStuns(GameTestHelper h) {
+		ServerPlayer p = player(h, CombatMode.FORCED_ON);
+		Zombie z = zombie(h, 2.5, 3.5);
+		CombatState state = CombatStateManager.get(p);
+		float hp = z.getHealth();
+
+		CombatDirector.requestAttack(p, z);
+		CombatStateManager.handleInput(p, new CombatInputPayload(CombatAction.COUNTER, 0, 0, FACING_PLUS_Z));
+		EnemySlot slot = state.enemies.get(z.getId());
+		long now = h.getLevel().getGameTime();
+		h.assertTrue(!slot.isTelegraphing(), "counter should cancel the attack");
+		h.assertTrue(slot.isStunned(now), "countered enemy should be stunned");
+		h.assertTrue(z.getHealth() < hp, "counter should damage the enemy");
+		h.assertTrue(z.hasEffect(MobEffects.MOVEMENT_SLOWDOWN), "countered enemy should be slowed");
+		h.assertTrue(state.combo == 1, "counter should add to the combo");
+		h.assertTrue(!CombatDirector.requestAttack(p, z), "stunned enemy can't attack");
+		h.runAfterDelay(15, () -> {
+			h.assertTrue(!z.swinging, "countered attack must never land");
+			h.succeed();
+		});
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE)
+	public void multiCounterHitsEveryAttacker(GameTestHelper h) {
+		ServerPlayer p = player(h, CombatMode.FORCED_ON);
+		Zombie a = zombie(h, 2.5, 3.5);
+		Zombie b = zombie(h, 3.5, 2.5);
+		CombatState state = CombatStateManager.get(p);
+
+		CombatDirector.requestAttack(p, a);
+		h.runAfterDelay(6, () -> {
+			h.assertTrue(CombatDirector.requestAttack(p, b), "B should start its attack");
+			CombatStateManager.handleInput(p, new CombatInputPayload(CombatAction.COUNTER, 0, 0, FACING_PLUS_Z));
+			h.assertTrue(CombatDirector.activeAttacks(state) == 0, "one press should counter both attackers");
+			h.assertTrue(state.combo == 2, "each countered enemy adds a combo hit, combo was " + state.combo);
+			h.succeed();
+		});
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE)
+	public void counterWithNothingLocksOut(GameTestHelper h) {
+		ServerPlayer p = player(h, CombatMode.FORCED_ON);
+		CombatState state = CombatStateManager.get(p);
+
+		CombatStateManager.handleInput(p, new CombatInputPayload(CombatAction.COUNTER, 0, 0, FACING_PLUS_Z));
+		h.assertTrue(state.counterCooldownUntil > h.getLevel().getGameTime(), "whiffed counter should lock out");
+		int acked = state.acceptedInputs;
+		CombatStateManager.handleInput(p, new CombatInputPayload(CombatAction.COUNTER, 0, 0, FACING_PLUS_Z));
+		h.assertTrue(state.acceptedInputs == acked, "counter spam during lockout should be ignored");
 		h.succeed();
 	}
 }

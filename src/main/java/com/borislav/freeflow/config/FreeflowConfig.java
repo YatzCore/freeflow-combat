@@ -63,6 +63,31 @@ public final class FreeflowConfig {
 	public static int staggerTicks = 8;
 	public static boolean staggerBreaksCombo = true;
 
+	// --- Combat director (enemy turn-taking) ---
+
+	/** Max enemies with an attack in progress against one player at the same time. */
+	public static int maxSimultaneousAttackers = 2;
+	/** Warning time before an enemy attack lands (12 = 0.6s): the counter window. */
+	public static int telegraphTicks = 12;
+	/** Min ticks between two enemies starting their attacks. */
+	public static int telegraphGapTicks = 5;
+	/** Per-enemy cooldown after attacking, randomised between min and max. */
+	public static int enemyAttackCooldownMin = 25;
+	public static int enemyAttackCooldownMax = 50;
+	/** Distance waiting enemies keep while circling. */
+	public static double circleRadius = 3.5;
+
+	// --- Counter ---
+
+	/** Telegraphed enemies within this distance are countered. */
+	public static double counterRange = 5.0;
+	public static float counterDamage = 3.0f;
+	public static double counterKnockback = 0.9;
+	/** How long a countered enemy is stunned (slowed, can't attack). */
+	public static int counterStunTicks = 30;
+	/** Lockout after pressing counter with nothing to counter. */
+	public static int counterWhiffTicks = 10;
+
 	// --- Camera (client) ---
 
 	/** Master switch for the over-the-shoulder combat camera. */

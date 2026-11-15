@@ -15,6 +15,7 @@ public final class MoveRegistry {
 
 	public static void init() {
 		register(CombatAction.STRIKE, new StrikeMove());
+		register(CombatAction.COUNTER, new CounterMove());
 	}
 
 	public static void register(CombatAction action, Move move) {
