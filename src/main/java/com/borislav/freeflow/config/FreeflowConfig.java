@@ -106,6 +106,33 @@ public final class FreeflowConfig {
 	public static boolean doubleTapEvade = true;
 	public static int doubleTapWindowTicks = 6;
 
+	// --- Stun / beatdown / takedowns ---
+
+	public static double stunRange = 4.0;
+	/** How long a stun lasts (40 = 2s). */
+	public static int stunTicks = 40;
+	public static int stunCooldownTicks = 15;
+	/** Lockout after stunning at nothing. */
+	public static int stunWhiffTicks = 10;
+	/** Damage per beatdown hit (before combo scaling). Mashing is allowed during a beatdown. */
+	public static float beatdownDamage = 2.0f;
+	public static int beatdownRecoveryTicks = 1;
+	/** Each beatdown hit keeps the target stunned at least this much longer. */
+	public static int beatdownStunExtendTicks = 12;
+	/** The Nth beatdown hit is a finisher that knocks the enemy down. */
+	public static int beatdownFinisherHits = 5;
+	public static double finisherKnockback = 1.2;
+	/** How long a knocked-down enemy stays down (60 = 3s). */
+	public static int knockdownTicks = 60;
+	public static double groundTakedownRange = 3.5;
+	/** Ground takedown duration (the player is locked and vulnerable meanwhile). */
+	public static int groundTakedownTicks = 20;
+	/** Combo needed (and spent) for a special takedown. */
+	public static int specialTakedownCost = 8;
+	/** Mobs with more max health than this are "bosses": takedowns only deal heavy damage. */
+	public static float bossHealthThreshold = 50.0f;
+	public static float bossTakedownDamage = 12.0f;
+
 	// --- Camera (client) ---
 
 	/** Master switch for the over-the-shoulder combat camera. */

@@ -1,6 +1,7 @@
 package com.borislav.freeflow.combat;
 
 import com.borislav.freeflow.ai.CombatDirector;
+import com.borislav.freeflow.combat.moves.GroundTakedownMove;
 import com.borislav.freeflow.combat.moves.Move;
 import com.borislav.freeflow.combat.moves.MoveRegistry;
 import com.borislav.freeflow.network.CombatInputPayload;
@@ -50,6 +51,7 @@ public final class CombatStateManager {
 				CombatState state = STATES.get(player.getUUID());
 				if (state != null) {
 					ComboTracker.breakCombo(player, state);
+					GroundTakedownMove.interrupt(player, state);
 				}
 			}
 		});
@@ -101,8 +103,9 @@ public final class CombatStateManager {
 			if (!CombatModeTracker.isFreeflowActive(player, state)) {
 				return; // stale/forged input: ignore
 			}
-			if (player.level().getGameTime() < state.staggerUntil) {
-				return; // staggered: every move is locked out
+			long now = player.level().getGameTime();
+			if (now < state.staggerUntil || now < state.lockedUntil) {
+				return; // staggered or mid-takedown: every move is locked out
 			}
 			Move move = MoveRegistry.get(action);
 			if (move != null && !move.execute(player, state, payload)) {

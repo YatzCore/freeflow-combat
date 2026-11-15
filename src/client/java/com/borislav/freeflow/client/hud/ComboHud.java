@@ -2,6 +2,8 @@ package com.borislav.freeflow.client.hud;
 
 import com.borislav.freeflow.client.ClientCombatState;
 import com.borislav.freeflow.client.ClientCombo;
+import com.borislav.freeflow.client.Keybinds;
+import com.borislav.freeflow.config.FreeflowConfig;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
@@ -37,8 +39,25 @@ public final class ComboHud {
 		renderCombo(g, font, w, h, pt);
 		if (ClientCombatState.isFreeflowActive()) {
 			renderRhythm(g, w, h, pt);
+			renderPrompts(g, font, mc, w, h);
 		}
 		renderFlash(g, font, w, h, pt);
+	}
+
+	/** Takedown availability prompts under the combo counter. */
+	private static void renderPrompts(GuiGraphics g, Font font, Minecraft mc, int w, int h) {
+		int x = w - 24;
+		int y = h / 2 + 8;
+		if (ClientCombo.combo >= FreeflowConfig.specialTakedownCost) {
+			boolean blink = (ClientCombo.clientTick / 5) % 2 == 0;
+			String s = "SPECIAL TAKEDOWN [" + Keybinds.specialTakedown.getTranslatedKeyMessage().getString() + "]";
+			g.drawString(font, s, x - font.width(s), y, blink ? RED : ORANGE, true);
+			y += 11;
+		}
+		if (mc.player != null && StatusMarkers.knockedDownNear(mc.player, FreeflowConfig.groundTakedownRange)) {
+			String s = "GROUND TAKEDOWN [" + Keybinds.groundTakedown.getTranslatedKeyMessage().getString() + "]";
+			g.drawString(font, s, x - font.width(s), y, ORANGE, true);
+		}
 	}
 
 	private static void renderCombo(GuiGraphics g, Font font, int w, int h, float pt) {
@@ -98,6 +117,20 @@ public final class ComboHud {
 	}
 
 	private static void renderFlash(GuiGraphics g, Font font, int w, int h, float pt) {
+		float sinceFlash = ClientCombo.clientTick - ClientCombo.flashTick + pt;
+		if (sinceFlash < 20) {
+			int a = (int) (255 * Mth.clamp(1.0f - sinceFlash / 20.0f, 0f, 1f));
+			if (a >= 8) {
+				PoseStack pose = g.pose();
+				pose.pushPose();
+				pose.translate(w / 2.0f, h / 2.0f - 42, 0);
+				pose.scale(1.6f, 1.6f, 1.0f);
+				String s = ClientCombo.flashText;
+				g.drawString(font, s, -font.width(s) / 2, 0, (a << 24) | ClientCombo.flashColor, true);
+				pose.popPose();
+			}
+		}
+
 		float sinceCounter = ClientCombo.clientTick - ClientCombo.lastCounterTick + pt;
 		if (sinceCounter < 15) {
 			int a = (int) (255 * Mth.clamp(1.0f - sinceCounter / 15.0f, 0f, 1f));

@@ -4,7 +4,9 @@ import com.borislav.freeflow.FreeflowMod;
 import com.borislav.freeflow.client.camera.FreeflowCamera;
 import com.borislav.freeflow.client.hud.ComboHud;
 import com.borislav.freeflow.client.hud.DebugOverlay;
+import com.borislav.freeflow.client.hud.StatusMarkers;
 import com.borislav.freeflow.client.hud.TelegraphRenderer;
+import com.borislav.freeflow.network.CombatEventPayload;
 import com.borislav.freeflow.network.ComboPayload;
 import com.borislav.freeflow.network.CombatSyncPayload;
 import com.borislav.freeflow.network.CounterPayload;
@@ -56,8 +58,17 @@ public class FreeflowClient implements ClientModInitializer {
 		});
 		ClientPlayNetworking.registerGlobalReceiver(EvadePayload.TYPE,
 				(payload, context) -> EvadeController.onEvade(payload));
+		ClientPlayNetworking.registerGlobalReceiver(CombatEventPayload.TYPE, (payload, context) -> {
+			StatusMarkers.onEvent(payload);
+			ClientCombo.onEvent(payload);
+			if (payload.event() == CombatEventPayload.Type.STUN) {
+				LungeController.faceEntity(payload.mobId());
+			}
+		});
 		WorldRenderEvents.AFTER_ENTITIES.register(TelegraphRenderer::render);
+		WorldRenderEvents.AFTER_ENTITIES.register(StatusMarkers::render);
 		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
+			StatusMarkers.reset();
 			EvadeController.reset();
 			TelegraphRenderer.reset();
 			FreeflowCamera.exit(client);

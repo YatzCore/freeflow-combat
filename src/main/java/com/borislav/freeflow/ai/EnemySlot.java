@@ -9,8 +9,12 @@ public class EnemySlot {
 	public long attackAt = -1;
 	/** Earliest tick this enemy may start another attack. */
 	public long nextAllowed = 0;
-	/** Enemy is stunned (countered) until this tick. */
+	/** Enemy is stunned (countered / stunned / beaten down) until this tick: it can't attack. */
 	public long stunnedUntil = 0;
+	/** Enemy is knocked down until this tick (ground takedown possible). */
+	public long knockedDownUntil = 0;
+	/** Consecutive beatdown hits on this enemy. */
+	public int beatdownHits = 0;
 	/** Last time a circling move was issued (throttle). */
 	public long lastReposition = -100;
 
@@ -22,7 +26,12 @@ public class EnemySlot {
 		return attackAt >= 0;
 	}
 
+	/** Can't attack (stunned or knocked down). */
 	public boolean isStunned(long now) {
-		return now < stunnedUntil;
+		return now < stunnedUntil || now < knockedDownUntil;
+	}
+
+	public boolean isKnockedDown(long now) {
+		return now < knockedDownUntil;
 	}
 }

@@ -21,7 +21,7 @@ Project lives in this repo; JDK 21 (Temurin) is required to build.
 5. **Counter** — mobs telegraph attacks with a floating marker ~0.5s ahead (combat director delays their attack). Counter on **right mouse** (or `R`) in window: cancel attack, counter animation, knockdown/stun. **One press per warning**: when several enemies telegraph at once you must counter each one (soonest first); any you miss hits you.
 6. **Evade / vault** — double-tap direction or `Space`+dir in combat: dodge roll. Toward an enemy: vault over it (lands behind, keeps combo).
 7. **Stun + beatdown** — stun key (`G`) dazes target; holding strike on a stunned mob = rapid beatdown flurry ending in knockback.
-8. **Ground takedown** — knocked-down mobs can be finished (combo ≥5) with a ground slam key, kills non-boss mob.
+8. **Ground takedown** — knocked-down mobs (beatdown finisher) can be finished with the ground takedown key (V): takes 1s, player locked and vulnerable (getting hit interrupts it); knocks out non-boss mobs.
 9. **Special takedown** — at combo ×8, special key (`F`) instantly KOs a non-boss mob; combo spends 8.
 10. **Enemy roles** (via combat director tags, no new mob entities needed):
     - Normal (zombie, husk, drowned, piglin…): counterable.

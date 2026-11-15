@@ -29,7 +29,7 @@ public final class CombatDirector {
 		return state != null && CombatModeTracker.isFreeflowActive(player, state);
 	}
 
-	private static EnemySlot slot(CombatState state, Mob mob) {
+	public static EnemySlot slot(CombatState state, Mob mob) {
 		EnemySlot slot = state.enemies.get(mob.getId());
 		if (slot == null || slot.mob != mob) {
 			slot = new EnemySlot(mob);

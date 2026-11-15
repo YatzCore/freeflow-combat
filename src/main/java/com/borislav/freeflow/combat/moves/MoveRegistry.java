@@ -17,6 +17,9 @@ public final class MoveRegistry {
 		register(CombatAction.STRIKE, new StrikeMove());
 		register(CombatAction.COUNTER, new CounterMove());
 		register(CombatAction.EVADE, new EvadeMove());
+		register(CombatAction.STUN, new StunMove());
+		register(CombatAction.GROUND_TAKEDOWN, new GroundTakedownMove());
+		register(CombatAction.SPECIAL_TAKEDOWN, new SpecialTakedownMove());
 	}
 
 	public static void register(CombatAction action, Move move) {

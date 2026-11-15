@@ -86,6 +86,17 @@ public final class LungeController {
 		player.setYBodyRot(yaw);
 	}
 
+	/** Turn to face an entity by id (e.g. the enemy just stunned). */
+	public static void faceEntity(int entityId) {
+		Minecraft mc = Minecraft.getInstance();
+		if (mc.level != null && mc.player != null) {
+			Entity entity = mc.level.getEntity(entityId);
+			if (entity != null) {
+				face(mc.player, entity);
+			}
+		}
+	}
+
 	/** Counter: stop any lunge and turn to face the (first) countered enemy. */
 	public static void onCounter(java.util.List<Integer> mobIds) {
 		Minecraft mc = Minecraft.getInstance();

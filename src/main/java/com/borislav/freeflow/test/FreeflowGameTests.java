@@ -2,6 +2,7 @@ package com.borislav.freeflow.test;
 
 import com.borislav.freeflow.ai.CombatDirector;
 import com.borislav.freeflow.ai.EnemySlot;
+import com.borislav.freeflow.ai.EnemyStatus;
 import com.borislav.freeflow.combat.CombatAction;
 import com.borislav.freeflow.combat.CombatMode;
 import com.borislav.freeflow.combat.CombatModeTracker;
@@ -18,6 +19,7 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.entity.animal.IronGolem;
 import net.minecraft.world.entity.monster.Zombie;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.phys.Vec3;
@@ -449,6 +451,126 @@ public class FreeflowGameTests implements FabricGameTest {
 		state.evadeCooldownUntil = 0;
 		evade(p, -1.0f, 0); // away from it
 		h.assertTrue(state.lastVaultTarget == null, "evading away should be a plain evade");
+		h.succeed();
+	}
+
+	// --- Milestone 8: stun, beatdown, takedowns ---
+
+	private static void act(ServerPlayer p, CombatAction action) {
+		CombatStateManager.handleInput(p, new CombatInputPayload(action, 0, 0, FACING_PLUS_Z));
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE)
+	public void stunCancelsAttackAndStuns(GameTestHelper h) {
+		ServerPlayer p = player(h, CombatMode.FORCED_ON);
+		Zombie z = zombie(h, 2.5, 3.5);
+		CombatState state = CombatStateManager.get(p);
+
+		CombatDirector.requestAttack(p, z);
+		act(p, CombatAction.STUN);
+		EnemySlot slot = state.enemies.get(z.getId());
+		long now = h.getLevel().getGameTime();
+		h.assertTrue(!slot.isTelegraphing(), "stun should cancel the enemy's attack");
+		h.assertTrue(slot.isStunned(now), "enemy should be stunned");
+		h.assertTrue(!CombatDirector.requestAttack(p, z), "stunned enemy can't attack");
+		h.succeed();
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE)
+	public void beatdownAllowsMashing(GameTestHelper h) {
+		ServerPlayer p = player(h, CombatMode.FORCED_ON);
+		zombie(h, 2.5, 3.5);
+		CombatState state = CombatStateManager.get(p);
+
+		act(p, CombatAction.STUN);
+		for (int i = 0; i < 4; i++) {
+			act(p, CombatAction.STRIKE);
+		}
+		h.assertTrue(state.staggerUntil <= h.getLevel().getGameTime(), "mashing a stunned enemy must not stagger");
+		h.succeed();
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE, timeoutTicks = 80)
+	public void beatdownFinisherKnocksDown(GameTestHelper h) {
+		ServerPlayer p = player(h, CombatMode.FORCED_ON);
+		Zombie z = zombie(h, 2.5, 3.5);
+		CombatState state = CombatStateManager.get(p);
+
+		act(p, CombatAction.STUN);
+		h.onEachTick(() -> act(p, CombatAction.STRIKE)); // mash
+		h.succeedWhen(() -> {
+			EnemySlot slot = state.enemies.get(z.getId());
+			h.assertTrue(slot != null && slot.isKnockedDown(h.getLevel().getGameTime()),
+					"the beatdown finisher should knock the enemy down");
+			h.assertTrue(z.isAlive(), "a beatdown alone shouldn't kill a fresh zombie");
+		});
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE, timeoutTicks = 60)
+	public void groundTakedownFinishesKnockedDownEnemy(GameTestHelper h) {
+		ServerPlayer p = player(h, CombatMode.FORCED_ON);
+		Zombie z = zombie(h, 2.5, 3.5);
+		CombatState state = CombatStateManager.get(p);
+
+		EnemyStatus.knockDown(p, state, z, 60);
+		act(p, CombatAction.GROUND_TAKEDOWN);
+		h.assertTrue(state.lockedUntil > h.getLevel().getGameTime(), "player is locked during a ground takedown");
+		h.succeedWhen(() -> h.assertTrue(!z.isAlive(), "ground takedown should knock the enemy out"));
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE, timeoutTicks = 60)
+	public void groundTakedownInterruptedByDamage(GameTestHelper h) {
+		ServerPlayer p = player(h, CombatMode.FORCED_ON);
+		Zombie z = zombie(h, 2.5, 3.5);
+		CombatState state = CombatStateManager.get(p);
+
+		EnemyStatus.knockDown(p, state, z, 60);
+		act(p, CombatAction.GROUND_TAKEDOWN);
+		ServerLivingEntityEvents.AFTER_DAMAGE.invoker().afterDamage(p, p.damageSources().generic(), 2.0f, 2.0f, false);
+		h.assertTrue(state.takedownTarget == null, "getting hit should interrupt the takedown");
+		h.runAfterDelay(30, () -> {
+			h.assertTrue(z.isAlive(), "an interrupted takedown must not finish the enemy");
+			h.succeed();
+		});
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE)
+	public void groundTakedownNeedsKnockedDownEnemy(GameTestHelper h) {
+		ServerPlayer p = player(h, CombatMode.FORCED_ON);
+		zombie(h, 2.5, 3.5);
+		CombatState state = CombatStateManager.get(p);
+		int acked = state.acceptedInputs;
+		act(p, CombatAction.GROUND_TAKEDOWN);
+		h.assertTrue(state.acceptedInputs == acked, "no takedown on a standing enemy");
+		h.succeed();
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE, timeoutTicks = 60)
+	public void specialTakedownSpendsComboAndKnocksOut(GameTestHelper h) {
+		ServerPlayer p = player(h, CombatMode.FORCED_ON);
+		Zombie z = zombie(h, 2.5, 4.0);
+		CombatState state = CombatStateManager.get(p);
+
+		state.combo = 3;
+		state.lastComboTick = h.getLevel().getGameTime();
+		int acked = state.acceptedInputs;
+		act(p, CombatAction.SPECIAL_TAKEDOWN);
+		h.assertTrue(state.acceptedInputs == acked, "special takedown needs x8 combo");
+
+		state.combo = 9;
+		act(p, CombatAction.SPECIAL_TAKEDOWN);
+		h.assertTrue(state.combo == 1, "special takedown should spend 8 combo, combo is " + state.combo);
+		h.succeedWhen(() -> h.assertTrue(!z.isAlive(), "special takedown should knock the enemy out"));
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE)
+	public void bossesSurviveTakedowns(GameTestHelper h) {
+		ServerPlayer p = player(h, CombatMode.FORCED_ON);
+		IronGolem golem = h.spawn(EntityType.IRON_GOLEM, 2.5f, 1.0f, 4.5f);
+		golem.setNoAi(true);
+		h.assertTrue(EnemyStatus.isBoss(golem), "an iron golem (100 hp) counts as a boss");
+		EnemyStatus.knockOut(p, golem);
+		h.assertTrue(golem.isAlive(), "bosses only take heavy damage from takedowns");
 		h.succeed();
 	}
 

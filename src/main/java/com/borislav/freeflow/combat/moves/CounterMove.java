@@ -1,6 +1,6 @@
 package com.borislav.freeflow.combat.moves;
 
-import com.borislav.freeflow.ai.CombatDirector;
+import com.borislav.freeflow.ai.EnemyStatus;
 import com.borislav.freeflow.ai.EnemySlot;
 import com.borislav.freeflow.combat.CombatState;
 import com.borislav.freeflow.combat.ComboTracker;
@@ -14,8 +14,6 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
-import net.minecraft.world.effect.MobEffectInstance;
-import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Mob;
 
 import java.util.List;
@@ -66,16 +64,12 @@ public class CounterMove implements Move {
 
 	private static void counter(ServerPlayer player, CombatState state, EnemySlot slot, long now) {
 		Mob mob = slot.mob;
-		slot.attackAt = -1;
-		slot.stunnedUntil = now + FreeflowConfig.counterStunTicks;
-		slot.nextAllowed = now + FreeflowConfig.counterStunTicks + FreeflowConfig.enemyAttackCooldownMin;
-		CombatDirector.sendTelegraph(player, mob, 0);
-
 		mob.invulnerableTime = 0;
 		mob.hurt(player.damageSources().playerAttack(player), FreeflowConfig.counterDamage);
 		mob.knockback(FreeflowConfig.counterKnockback, player.getX() - mob.getX(), player.getZ() - mob.getZ());
-		mob.getNavigation().stop();
-		mob.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, FreeflowConfig.counterStunTicks, 6, false, false));
+		EnemyStatus.stun(player, state, mob, FreeflowConfig.counterStunTicks); // cancels the attack too
+		slot.nextAllowed = now + FreeflowConfig.counterStunTicks + FreeflowConfig.enemyAttackCooldownMin;
+		state.lastStrikeMob = mob; // strike right after a counter = beatdown
 		ComboTracker.onHit(player, state);
 
 		ServerLevel level = player.serverLevel();

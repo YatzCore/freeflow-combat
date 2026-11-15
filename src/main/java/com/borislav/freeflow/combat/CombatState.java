@@ -55,6 +55,19 @@ public class CombatState {
 	public long lastTelegraphTick = -100;
 	public long counterCooldownUntil = 0;
 
+	// --- Stun / beatdown / takedowns ---
+	/** Last enemy struck or stunned (beatdowns keep hitting it). */
+	@Nullable
+	public Mob lastStrikeMob;
+	/** The strike in flight is a special takedown. */
+	public boolean strikeIsSpecial = false;
+	public long stunCooldownUntil = 0;
+	/** All freeflow inputs are ignored until this tick (ground takedown animation). */
+	public long lockedUntil = 0;
+	@Nullable
+	public Mob takedownTarget;
+	public long takedownEndTick = -1;
+
 	// --- Evade ---
 	public long evadeCooldownUntil = 0;
 	/** Enemy the last evade vaulted over (null = plain evade). */
@@ -67,6 +80,10 @@ public class CombatState {
 		strikeHitTick = -1;
 		bufferedStrike = null;
 		earlyPresses = 0;
+		strikeIsSpecial = false;
+		takedownTarget = null;
+		takedownEndTick = -1;
+		lockedUntil = 0;
 	}
 
 	/** Set whenever a synced field changes; the manager sends a sync packet and clears it. */

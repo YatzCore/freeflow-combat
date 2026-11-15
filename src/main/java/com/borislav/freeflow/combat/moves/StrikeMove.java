@@ -1,11 +1,15 @@
 package com.borislav.freeflow.combat.moves;
 
-import com.borislav.freeflow.combat.ComboTracker;
+import com.borislav.freeflow.ai.CombatDirector;
+import com.borislav.freeflow.ai.EnemySlot;
+import com.borislav.freeflow.ai.EnemyStatus;
 import com.borislav.freeflow.combat.CombatModeTracker;
 import com.borislav.freeflow.combat.CombatState;
+import com.borislav.freeflow.combat.ComboTracker;
 import com.borislav.freeflow.combat.Directions;
 import com.borislav.freeflow.combat.TargetSelector;
 import com.borislav.freeflow.config.FreeflowConfig;
+import com.borislav.freeflow.network.CombatEventPayload;
 import com.borislav.freeflow.network.CombatInputPayload;
 import com.borislav.freeflow.network.StrikeStartPayload;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
@@ -17,6 +21,7 @@ import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Mob;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Strike: snap to the best target, lunge to it (movement done by the client, which
@@ -25,6 +30,10 @@ import net.minecraft.world.entity.Mob;
  * Timing is server-authoritative: the hit resolves after the lunge's travel ticks,
  * provided the player actually got close enough. Presses during a strike are
  * buffered (one deep) and fire as soon as the current one recovers.
+ *
+ * Striking a stunned enemy is a beatdown: fast, light hits where mashing is allowed;
+ * the Nth hit is a finisher that knocks the enemy down. The same lunge/hit pipeline
+ * also carries special takedowns (see {@link SpecialTakedownMove}).
  */
 public class StrikeMove implements Move {
 
@@ -36,7 +45,9 @@ public class StrikeMove implements Move {
 		}
 		if (state.strikeHitTick >= 0 || now < state.nextStrikeTick) {
 			// Busy. On-beat = during recovery or just before the current hit lands.
-			boolean onBeat = state.strikeHitTick < 0 || state.strikeHitTick - now <= FreeflowConfig.rhythmWindowTicks;
+			// Beatdowns on a stunned enemy are meant to be mashed: never stagger.
+			boolean onBeat = state.strikeHitTick < 0 || state.strikeHitTick - now <= FreeflowConfig.rhythmWindowTicks
+					|| beatdownTarget(state, now) != null;
 			if (!onBeat && ++state.earlyPresses >= FreeflowConfig.rhythmSpamLimit) {
 				ComboTracker.stagger(player, state); // button mashing
 				return true;
@@ -54,10 +65,10 @@ public class StrikeMove implements Move {
 
 		if (state.strikeHitTick >= 0 && now >= state.strikeHitTick) {
 			state.strikeHitTick = -1;
-			boolean hit = resolveHit(player, state);
-			if (hit) {
+			int recovery = resolveHit(player, state, now);
+			if (recovery >= 0) {
 				ComboTracker.onHit(player, state);
-				state.nextStrikeTick = now + ComboTracker.recoveryTicks(state);
+				state.nextStrikeTick = now + recovery;
 			} else {
 				ComboTracker.breakCombo(player, state);
 				state.nextStrikeTick = now + FreeflowConfig.whiffRecoveryTicks;
@@ -66,7 +77,7 @@ public class StrikeMove implements Move {
 		ComboTracker.tick(player, state);
 
 		if (state.bufferedStrike != null && state.strikeHitTick < 0 && now >= state.nextStrikeTick
-				&& now >= state.staggerUntil) {
+				&& now >= state.staggerUntil && now >= state.lockedUntil) {
 			CombatInputPayload buffered = state.bufferedStrike;
 			state.bufferedStrike = null;
 			if (CombatModeTracker.isFreeflowActive(player, state)) {
@@ -75,14 +86,38 @@ public class StrikeMove implements Move {
 		}
 	}
 
+	/** The enemy being beaten down: last target, still stunned (not knocked down) and close. */
+	@Nullable
+	private static Mob beatdownTarget(CombatState state, long now) {
+		Mob mob = state.lastStrikeMob;
+		if (mob == null || !mob.isAlive()) {
+			return null;
+		}
+		EnemySlot slot = state.enemies.get(mob.getId());
+		return slot != null && slot.mob == mob && now < slot.stunnedUntil && !slot.isKnockedDown(now) ? mob : null;
+	}
+
 	private static void start(ServerPlayer player, CombatState state, CombatInputPayload input, long now) {
+		Mob target = null;
+		boolean directional = input.forward() * input.forward() + input.strafe() * input.strafe() > 0.04f;
+		Mob beatdown = beatdownTarget(state, now);
+		if (!directional && beatdown != null && beatdown.distanceTo(player) < 3.5) {
+			target = beatdown; // keep pounding the stunned enemy unless steering elsewhere
+		}
+		if (target == null) {
+			target = TargetSelector.select(player, input.aimYaw(), input.forward(), input.strafe(),
+					ComboTracker.range(state));
+		}
+		launch(player, state, target, false, now);
+	}
+
+	/** Starts the lunge + hit at a chosen target ({@code null} = whiff). */
+	public static void launch(ServerPlayer player, CombatState state, @Nullable Mob target, boolean special, long now) {
 		state.strikeIndex++;
 		state.earlyPresses = 0;
 		InteractionHand hand = state.strikeIndex % 2 == 0 ? InteractionHand.MAIN_HAND : InteractionHand.OFF_HAND;
 		player.swing(hand, true);
 
-		Mob target = TargetSelector.select(player, input.aimYaw(), input.forward(), input.strafe(),
-				ComboTracker.range(state));
 		if (target == null) {
 			state.strikeTarget = null;
 			state.nextStrikeTick = now + FreeflowConfig.whiffRecoveryTicks;
@@ -99,43 +134,80 @@ public class StrikeMove implements Move {
 		}
 
 		state.strikeTarget = target;
+		state.strikeIsSpecial = special;
+		state.lastStrikeMob = target;
 		state.strikeHitTick = now + Math.max(1, travel);
-		state.invulnerableUntil = now + travel + 2; // brief i-frames while dashing in
+		state.invulnerableUntil = Math.max(state.invulnerableUntil, now + travel + (special ? 6 : 2));
 		send(player, target.getId(), travel);
 	}
 
-	/** Applies the hit if the target is still valid and the player is close enough. */
-	private static boolean resolveHit(ServerPlayer player, CombatState state) {
+	/**
+	 * Applies the hit if the target is still valid and the player is close enough.
+	 * Returns the recovery ticks before the next strike, or -1 if nothing was hit.
+	 */
+	private static int resolveHit(ServerPlayer player, CombatState state, long now) {
 		Mob target = state.strikeTarget;
+		boolean special = state.strikeIsSpecial;
 		state.strikeTarget = null;
+		state.strikeIsSpecial = false;
 		if (target == null || !target.isAlive() || target.level() != player.level()) {
-			return false;
+			return -1;
 		}
 		if (Directions.horizontalDistance(player, target) > stopDistance(target) + FreeflowConfig.hitValidationSlack) {
-			return false; // the lunge didn't get us there (blocked, lag, or forged input)
+			return -1; // the lunge didn't get us there (blocked, lag, or forged input)
+		}
+		ServerLevel level = player.serverLevel();
+
+		if (special) {
+			EnemyStatus.knockOut(player, target);
+			EnemyStatus.event(player, CombatEventPayload.Type.SPECIAL_TAKEDOWN, target, 0);
+			level.playSound(null, target.getX(), target.getY(), target.getZ(), SoundEvents.PLAYER_ATTACK_CRIT,
+					SoundSource.PLAYERS, 1.2f, 0.6f);
+			level.sendParticles(ParticleTypes.EXPLOSION, target.getX(), target.getY(0.5), target.getZ(), 1, 0, 0, 0, 0);
+			return ComboTracker.recoveryTicks(state) + 2;
 		}
 
+		EnemySlot slot = CombatDirector.slot(state, target);
+		boolean beatdown = now < slot.stunnedUntil && !slot.isKnockedDown(now);
+		float damage = beatdown
+				? FreeflowConfig.beatdownDamage * ComboTracker.damage(state) / FreeflowConfig.strikeDamage
+				: ComboTracker.damage(state);
+
 		target.invulnerableTime = 0; // freeflow hits are faster than vanilla i-frames
-		boolean hurt = target.hurt(player.damageSources().playerAttack(player), ComboTracker.damage(state));
-		if (!hurt) {
-			return false;
+		if (!target.hurt(player.damageSources().playerAttack(player), damage)) {
+			return -1;
 		}
-		target.knockback(FreeflowConfig.strikeKnockback, player.getX() - target.getX(), player.getZ() - target.getZ());
 		player.setLastHurtMob(target);
 		player.causeFoodExhaustion(0.1f);
 
-		ServerLevel level = player.serverLevel();
+		int recovery = ComboTracker.recoveryTicks(state);
+		if (beatdown) {
+			recovery = FreeflowConfig.beatdownRecoveryTicks;
+			slot.stunnedUntil = Math.max(slot.stunnedUntil, now + FreeflowConfig.beatdownStunExtendTicks);
+			if (++slot.beatdownHits >= FreeflowConfig.beatdownFinisherHits && target.isAlive()) {
+				target.knockback(FreeflowConfig.finisherKnockback, player.getX() - target.getX(), player.getZ() - target.getZ());
+				EnemyStatus.knockDown(player, state, target, FreeflowConfig.knockdownTicks);
+				level.playSound(null, target.getX(), target.getY(), target.getZ(), SoundEvents.PLAYER_ATTACK_KNOCKBACK,
+						SoundSource.PLAYERS, 1.2f, 0.7f);
+				recovery = ComboTracker.recoveryTicks(state) + 2;
+			}
+		} else {
+			slot.beatdownHits = 0;
+			target.knockback(FreeflowConfig.strikeKnockback, player.getX() - target.getX(), player.getZ() - target.getZ());
+		}
+
 		level.playSound(null, target.getX(), target.getY(), target.getZ(), SoundEvents.PLAYER_ATTACK_STRONG,
-				SoundSource.PLAYERS, 1.0f, 0.9f + level.random.nextFloat() * 0.2f);
-		level.sendParticles(ParticleTypes.CRIT, target.getX(), target.getY(0.6), target.getZ(), 8, 0.25, 0.25, 0.25, 0.2);
-		return true;
+				SoundSource.PLAYERS, beatdown ? 0.7f : 1.0f, (beatdown ? 1.2f : 0.9f) + level.random.nextFloat() * 0.2f);
+		level.sendParticles(ParticleTypes.CRIT, target.getX(), target.getY(0.6), target.getZ(), beatdown ? 4 : 8,
+				0.25, 0.25, 0.25, 0.2);
+		return recovery;
 	}
 
 	public static double stopDistance(Mob target) {
 		return target.getBbWidth() / 2.0 + FreeflowConfig.lungeStopGap;
 	}
 
-	private static void send(ServerPlayer player, int targetId, int travelTicks) {
+	public static void send(ServerPlayer player, int targetId, int travelTicks) {
 		if (ServerPlayNetworking.canSend(player, StrikeStartPayload.TYPE)) {
 			ServerPlayNetworking.send(player, new StrikeStartPayload(targetId, travelTicks));
 		}
