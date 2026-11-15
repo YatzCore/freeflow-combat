@@ -51,7 +51,7 @@ public final class CombatAnimations {
 		IAnimation data = PlayerAnimationAccess.getPlayerAssociatedData(player).get(LAYER_ID);
 		if (data instanceof ModifierLayer<?> layer) {
 			((ModifierLayer<IAnimation>) layer).replaceAnimationWithFade(
-					AbstractFadeModifier.standardFadeIn(2, Ease.OUTQUAD), animation.playAnimation());
+					AbstractFadeModifier.standardFadeIn(1, Ease.OUTQUAD), animation.playAnimation());
 		}
 	}
 }

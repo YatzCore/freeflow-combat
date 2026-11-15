@@ -1,5 +1,6 @@
 package com.borislav.freeflow.client;
 
+import com.borislav.freeflow.client.camera.Impact;
 import com.borislav.freeflow.config.FreeflowConfig;
 import com.borislav.freeflow.network.CombatEventPayload;
 import com.borislav.freeflow.network.ComboPayload;
@@ -78,7 +79,11 @@ public final class ClientCombo {
 				staggerUntilTick = clientTick + payload.ticks();
 				strikeLandTick = -1;
 			}
-			case DEFLECT -> onCounter(1);
+			case DEFLECT -> {
+				onCounter(1);
+				Impact.hit(1);
+			}
+			case HIT -> Impact.hit(payload.ticks());
 			case CANT_COUNTER -> flash("CAN'T COUNTER - EVADE!", 0xFF3B30);
 			default -> {}
 		}

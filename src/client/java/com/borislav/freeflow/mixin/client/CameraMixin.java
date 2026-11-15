@@ -2,6 +2,7 @@ package com.borislav.freeflow.mixin.client;
 
 import com.borislav.freeflow.client.camera.CinematicShots;
 import com.borislav.freeflow.client.camera.FreeflowCamera;
+import com.borislav.freeflow.client.camera.Impact;
 import com.borislav.freeflow.config.FreeflowConfig;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
@@ -48,7 +49,8 @@ public abstract class CameraMixin {
 		} else if (FreeflowCamera.currentDistance() < FreeflowConfig.hidePlayerDistance) {
 			detached = false; // too close: don't draw the player model over the whole screen
 		}
+		Impact.frame();
 		setRotation(yaw, pitch);
-		setPosition(pos);
+		setPosition(pos.add(Impact.shakeOffset()));
 	}
 }

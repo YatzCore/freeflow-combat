@@ -118,6 +118,7 @@ public class CounterMove implements Move {
 		slot.nextAllowed = now + FreeflowConfig.counterStunTicks + FreeflowConfig.enemyAttackCooldownMin;
 		state.lastStrikeMob = mob; // strike right after a counter = beatdown
 		ComboTracker.onHit(player, state);
+		ImpactFx.hit(player, mob, Anim.MEDIUM);
 
 		ServerLevel level = player.serverLevel();
 		level.playSound(null, mob.getX(), mob.getY(), mob.getZ(), SoundEvents.PLAYER_ATTACK_KNOCKBACK,

@@ -31,6 +31,9 @@ public final class FreeflowConfig {
 	public static double strikeCloseRange = 2.5;
 	public static float strikeDamage = 4.0f;
 	public static double strikeKnockback = 0.35;
+	/** Heavy hits (kicks, haymakers, flying attacks) knock enemies back further and lift them. */
+	public static double heavyKnockback = 0.8;
+	public static double heavyLift = 0.3;
 	/** Lunge speed in blocks per tick (20 ticks = 1s). */
 	public static double lungeSpeed = 1.6;
 	public static int maxLungeTicks = 6;
@@ -198,6 +201,13 @@ public final class FreeflowConfig {
 	/** Cinematic shot length and how much of it is in slow motion (client ticks). */
 	public static int cinematicTicks = 16;
 	public static int cinematicSlowMoTicks = 8;
+	/** Hit-stop: the game freezes for a few ms on impact (client-side, per strength). */
+	public static boolean hitStop = true;
+	public static long hitStopLightMs = 35;
+	public static long hitStopMediumMs = 60;
+	public static long hitStopHeavyMs = 100;
+	/** Camera shake + FOV punch on impact. */
+	public static boolean cameraShake = true;
 	/** Show a marker on the enemy your next strike would snap to. */
 	public static boolean targetIndicator = true;
 	/** Hide the player model when the camera is pushed closer than this (blocks). */

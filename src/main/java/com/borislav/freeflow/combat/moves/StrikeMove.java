@@ -128,16 +128,10 @@ public class StrikeMove implements Move {
 			state.strikeTarget = null;
 			state.nextStrikeTick = now + FreeflowConfig.whiffRecoveryTicks;
 			ComboTracker.breakCombo(player, state); // swinging at air breaks the flow
-			Anim.play(player, Anim.strike(state.strikeIndex));
+			Anim.play(player, Anim.chooseStrike(state.strikeIndex, 0, 0));
 			send(player, -1, 0);
 			return;
 		}
-
-		EnemySlot targetSlot = state.enemies.get(target.getId());
-		boolean beatdown = !special && targetSlot != null && targetSlot.mob == target
-				&& now < targetSlot.stunnedUntil && !targetSlot.isKnockedDown(now);
-		Anim.play(player, special ? Anim.SPECIAL_TAKEDOWN
-				: beatdown ? Anim.beatdown(state.strikeIndex) : Anim.strike(state.strikeIndex));
 
 		double dist = Directions.horizontalDistance(player, target);
 		double stop = stopDistance(target);
@@ -145,6 +139,17 @@ public class StrikeMove implements Move {
 		if (dist > stop + 0.3) {
 			travel = Mth.clamp(Mth.ceil((dist - stop) / FreeflowConfig.lungeSpeed), 1, FreeflowConfig.maxLungeTicks);
 		}
+
+		// Pick the move: special takedown, beatdown jabs, a flying attack for long lunges,
+		// or the next strike in the combo string (flashier as the combo grows).
+		EnemySlot targetSlot = state.enemies.get(target.getId());
+		boolean beatdown = !special && targetSlot != null && targetSlot.mob == target
+				&& now < targetSlot.stunnedUntil && !targetSlot.isKnockedDown(now);
+		String move = special ? Anim.SPECIAL_TAKEDOWN
+				: beatdown ? Anim.beatdown(state.strikeIndex)
+				: Anim.chooseStrike(state.strikeIndex, travel, state.combo);
+		state.strikeStrength = Anim.strength(move);
+		Anim.play(player, move);
 
 		state.strikeTarget = target;
 		state.strikeIsSpecial = special;
@@ -174,9 +179,7 @@ public class StrikeMove implements Move {
 		if (special) {
 			EnemyStatus.knockOut(player, target);
 			EnemyStatus.event(player, CombatEventPayload.Type.SPECIAL_TAKEDOWN, target, 0);
-			level.playSound(null, target.getX(), target.getY(), target.getZ(), SoundEvents.PLAYER_ATTACK_CRIT,
-					SoundSource.PLAYERS, 1.2f, 0.6f);
-			level.sendParticles(ParticleTypes.EXPLOSION, target.getX(), target.getY(0.5), target.getZ(), 1, 0, 0, 0, 0);
+			ImpactFx.hit(player, target, Anim.HEAVY);
 			return ComboTracker.recoveryTicks(state) + 2;
 		}
 
@@ -192,9 +195,10 @@ public class StrikeMove implements Move {
 			return BLOCKED;
 		}
 
+		int strength = beatdown ? Anim.LIGHT : state.strikeStrength;
 		float damage = beatdown
 				? FreeflowConfig.beatdownDamage * ComboTracker.damage(state) / FreeflowConfig.strikeDamage
-				: ComboTracker.damage(state);
+				: ComboTracker.damage(state) * ImpactFx.damageMultiplier(strength);
 
 		target.invulnerableTime = 0; // freeflow hits are faster than vanilla i-frames
 		if (!target.hurt(player.damageSources().playerAttack(player), damage)) {
@@ -221,19 +225,15 @@ public class StrikeMove implements Move {
 				target.knockback(FreeflowConfig.finisherKnockback, player.getX() - target.getX(), player.getZ() - target.getZ());
 				EnemyStatus.knockDown(player, state, target, FreeflowConfig.knockdownTicks);
 				Anim.play(player, Anim.FINISHER);
-				level.playSound(null, target.getX(), target.getY(), target.getZ(), SoundEvents.PLAYER_ATTACK_KNOCKBACK,
-						SoundSource.PLAYERS, 1.2f, 0.7f);
+				strength = Anim.HEAVY;
 				recovery = ComboTracker.recoveryTicks(state) + 2;
 			}
 		} else {
 			slot.beatdownHits = 0;
-			target.knockback(FreeflowConfig.strikeKnockback, player.getX() - target.getX(), player.getZ() - target.getZ());
+			ImpactFx.knockback(player, target, strength);
 		}
 
-		level.playSound(null, target.getX(), target.getY(), target.getZ(), SoundEvents.PLAYER_ATTACK_STRONG,
-				SoundSource.PLAYERS, beatdown ? 0.7f : 1.0f, (beatdown ? 1.2f : 0.9f) + level.random.nextFloat() * 0.2f);
-		level.sendParticles(ParticleTypes.CRIT, target.getX(), target.getY(0.6), target.getZ(), beatdown ? 4 : 8,
-				0.25, 0.25, 0.25, 0.2);
+		ImpactFx.hit(player, target, strength);
 		return recovery;
 	}
 

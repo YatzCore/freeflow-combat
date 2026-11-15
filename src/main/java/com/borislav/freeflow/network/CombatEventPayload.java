@@ -20,7 +20,9 @@ public record CombatEventPayload(Type event, int mobId, int ticks) implements Cu
 		/** Counter pressed but the only attacks coming are armed (uncounterable). */
 		CANT_COUNTER,
 		/** A strike killed the last enemy fighting the player (cinematic finisher). */
-		FINAL_HIT;
+		FINAL_HIT,
+		/** A hit landed; {@code ticks} carries its strength (1 light, 2 medium, 3 heavy) for camera impact. */
+		HIT;
 
 		static Type byId(int id) {
 			Type[] v = values();

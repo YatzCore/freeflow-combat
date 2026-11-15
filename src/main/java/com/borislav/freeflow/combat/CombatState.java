@@ -61,6 +61,8 @@ public class CombatState {
 	public Mob lastStrikeMob;
 	/** The strike in flight is a special takedown. */
 	public boolean strikeIsSpecial = false;
+	/** Strength of the strike in flight (Anim.LIGHT / MEDIUM / HEAVY). */
+	public int strikeStrength = 2;
 	public long stunCooldownUntil = 0;
 	/** All freeflow inputs are ignored until this tick (ground takedown animation). */
 	public long lockedUntil = 0;

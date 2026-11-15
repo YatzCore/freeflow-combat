@@ -76,6 +76,7 @@ public class GroundTakedownMove implements Move {
 		}
 		EnemyStatus.knockOut(player, target);
 		ComboTracker.onHit(player, state);
+		ImpactFx.hit(player, target, Anim.HEAVY);
 		EnemyStatus.event(player, CombatEventPayload.Type.TAKEDOWN, target, 0);
 		player.serverLevel().playSound(null, target.getX(), target.getY(), target.getZ(),
 				SoundEvents.PLAYER_ATTACK_KNOCKBACK, SoundSource.PLAYERS, 1.3f, 0.5f);

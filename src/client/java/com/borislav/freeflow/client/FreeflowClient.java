@@ -6,6 +6,7 @@ import com.borislav.freeflow.client.camera.CinematicShots;
 import com.borislav.freeflow.network.AnimationPayload;
 import com.borislav.freeflow.client.camera.CombatFraming;
 import com.borislav.freeflow.client.camera.FreeflowCamera;
+import com.borislav.freeflow.client.camera.Impact;
 import com.borislav.freeflow.client.hud.TargetIndicator;
 import com.borislav.freeflow.client.hud.ComboHud;
 import com.borislav.freeflow.client.hud.DebugOverlay;
@@ -83,6 +84,7 @@ public class FreeflowClient implements ClientModInitializer {
 		WorldRenderEvents.AFTER_ENTITIES.register(TargetIndicator::render);
 		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
 			CinematicShots.reset();
+			Impact.reset();
 			CombatFraming.reset();
 			TargetIndicator.reset();
 			StatusMarkers.reset();

@@ -824,6 +824,31 @@ public class FreeflowGameTests implements FabricGameTest {
 		h.succeed();
 	}
 
+	@GameTest(template = EMPTY_STRUCTURE)
+	public void strikeMovesVaryWithDistanceAndCombo(GameTestHelper h) {
+		var Anim = new Object() {
+			String pick(int index, int travel, int combo) {
+				return com.borislav.freeflow.combat.Anim.chooseStrike(index, travel, combo);
+			}
+		};
+		String longLunge = Anim.pick(0, 4, 0);
+		h.assertTrue(longLunge.startsWith("flying_"), "long lunges should be flying attacks, got " + longLunge);
+		java.util.Set<String> low = new java.util.HashSet<>();
+		java.util.Set<String> high = new java.util.HashSet<>();
+		for (int i = 0; i < 12; i++) {
+			low.add(Anim.pick(i, 0, 0));
+			high.add(Anim.pick(i, 0, 15));
+		}
+		h.assertTrue(low.size() >= 3, "low-combo strings should still vary, got " + low);
+		h.assertTrue(high.contains("spin_backfist") && high.contains("haymaker"),
+				"high combos should unlock flashy moves, got " + high);
+		h.assertTrue(com.borislav.freeflow.combat.Anim.strength("haymaker") == com.borislav.freeflow.combat.Anim.HEAVY,
+				"haymaker is a heavy hit");
+		h.assertTrue(com.borislav.freeflow.combat.Anim.strength("jab_right") == com.borislav.freeflow.combat.Anim.LIGHT,
+				"jab is a light hit");
+		h.succeed();
+	}
+
 	private static void counter(ServerPlayer p) {
 		CombatStateManager.handleInput(p, new CombatInputPayload(CombatAction.COUNTER, 0, 0, FACING_PLUS_Z));
 	}
