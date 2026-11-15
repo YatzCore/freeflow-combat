@@ -121,10 +121,10 @@ public final class FreeflowConfig {
 	public static int beatdownStunExtendTicks = 12;
 	/** The Nth beatdown hit is a finisher that knocks the enemy down. */
 	public static int beatdownFinisherHits = 5;
-	public static double finisherKnockback = 1.2;
+	public static double finisherKnockback = 0.4;
 	/** How long a knocked-down enemy stays down (60 = 3s). */
 	public static int knockdownTicks = 60;
-	public static double groundTakedownRange = 3.5;
+	public static double groundTakedownRange = 6.0;
 	/** Ground takedown duration (the player is locked and vulnerable meanwhile). */
 	public static int groundTakedownTicks = 20;
 	/** Combo needed (and spent) for a special takedown. */

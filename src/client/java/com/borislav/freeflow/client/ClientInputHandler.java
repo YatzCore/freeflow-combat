@@ -3,6 +3,7 @@ package com.borislav.freeflow.client;
 import com.borislav.freeflow.client.camera.FreeflowCamera;
 import com.borislav.freeflow.client.camera.RelativeMovement;
 import com.borislav.freeflow.client.hud.DebugOverlay;
+import com.borislav.freeflow.client.hud.StatusMarkers;
 import com.borislav.freeflow.combat.CombatAction;
 import com.borislav.freeflow.config.FreeflowConfig;
 import com.borislav.freeflow.network.CombatInputPayload;
@@ -39,8 +40,26 @@ public final class ClientInputHandler {
 		pressed(Keybinds.counter, active, CombatAction.COUNTER);
 		pressed(Keybinds.evade, active, CombatAction.EVADE);
 		pressed(Keybinds.stun, active, CombatAction.STUN);
-		pressed(Keybinds.groundTakedown, active, CombatAction.GROUND_TAKEDOWN);
-		pressed(Keybinds.specialTakedown, active, CombatAction.SPECIAL_TAKEDOWN);
+		while (Keybinds.groundTakedown.consumeClick()) {
+			if (!active) {
+				continue;
+			}
+			if (StatusMarkers.knockedDownNear(client.player, FreeflowConfig.groundTakedownRange)) {
+				send(CombatAction.GROUND_TAKEDOWN);
+			} else {
+				ClientCombo.flash("NO ENEMY DOWN NEARBY", 0x9A9A9A);
+			}
+		}
+		while (Keybinds.specialTakedown.consumeClick()) {
+			if (!active) {
+				continue;
+			}
+			if (ClientCombo.combo >= FreeflowConfig.specialTakedownCost) {
+				send(CombatAction.SPECIAL_TAKEDOWN);
+			} else {
+				ClientCombo.flash("NEEDS x" + FreeflowConfig.specialTakedownCost + " COMBO", 0x9A9A9A);
+			}
+		}
 		checkDoubleTap(client, active);
 	}
 

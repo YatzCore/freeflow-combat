@@ -506,6 +506,46 @@ public class FreeflowGameTests implements FabricGameTest {
 		});
 	}
 
+	/** Full chain as a player does it: stun, mash the beatdown, then V on the knocked-down enemy. */
+	@GameTest(template = EMPTY_STRUCTURE, timeoutTicks = 120)
+	public void beatdownThenGroundTakedownChain(GameTestHelper h) {
+		ServerPlayer p = player(h, CombatMode.FORCED_ON);
+		Vec3 start = h.absoluteVec(new Vec3(2.5, 1, 1.5));
+		p.moveTo(start.x, start.y, start.z, FACING_PLUS_Z, 0.0f);
+		Zombie z = h.spawn(EntityType.ZOMBIE, 2.5f, 1.0f, 2.5f); // real physics: knockback moves it
+		// AI stays on: a no-AI mob ignores knockback, which hid the original bug.
+		z.setItemSlot(EquipmentSlot.HEAD, new ItemStack(Items.LEATHER_HELMET));
+		CombatState state = CombatStateManager.get(p);
+
+		act(p, CombatAction.STUN);
+		boolean[] knockedDown = {false};
+		h.onEachTick(() -> {
+			EnemySlot slot = state.enemies.get(z.getId());
+			long now = h.getLevel().getGameTime();
+			if (!knockedDown[0] && slot != null && slot.isKnockedDown(now)) {
+				knockedDown[0] = true;
+				// Give the knockback a moment to play out, then take it down.
+				h.runAfterDelay(10, () -> {
+					act(p, CombatAction.GROUND_TAKEDOWN);
+					h.assertTrue(state.takedownTarget == z, String.format(
+							"V should start a ground takedown on the knocked-down zombie (distance %.2f)", z.distanceTo(p)));
+				});
+			} else if (!knockedDown[0]) {
+				act(p, CombatAction.STRIKE); // mash the beatdown
+			}
+		});
+		h.succeedWhen(() -> {
+			EnemySlot slot = state.enemies.get(z.getId());
+			long now = h.getLevel().getGameTime();
+			h.assertTrue(!z.isAlive(), String.format(
+					"the chain should end with the zombie taken down (knockedDown=%s, hp=%.1f, dist=%.2f, "
+							+ "stunned=%s, beatdownHits=%s, takedown=%s, lastAction=%s, acked=%d, inCombat=%s)",
+					knockedDown[0], z.getHealth(), z.distanceTo(p),
+					slot != null && now < slot.stunnedUntil, slot != null ? slot.beatdownHits : -1,
+					state.takedownTarget != null, state.lastAction, state.acceptedInputs, state.inCombat));
+		});
+	}
+
 	@GameTest(template = EMPTY_STRUCTURE, timeoutTicks = 60)
 	public void groundTakedownFinishesKnockedDownEnemy(GameTestHelper h) {
 		ServerPlayer p = player(h, CombatMode.FORCED_ON);

@@ -177,6 +177,12 @@ public class StrikeMove implements Move {
 		if (!target.hurt(player.damageSources().playerAttack(player), damage)) {
 			return -1;
 		}
+		if (beatdown) {
+			// Vanilla hurt() knocks the target back ~0.4 per hit; a beatdown pins it in place,
+			// otherwise it drifts out of reach before the finisher (and the ground takedown).
+			target.setDeltaMovement(0.0, target.getDeltaMovement().y, 0.0);
+			target.hurtMarked = true;
+		}
 		player.setLastHurtMob(target);
 		player.causeFoodExhaustion(0.1f);
 

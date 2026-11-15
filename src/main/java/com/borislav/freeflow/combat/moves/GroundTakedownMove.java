@@ -54,7 +54,8 @@ public class GroundTakedownMove implements Move {
 
 		double dist = Directions.horizontalDistance(player, target);
 		int travel = dist > StrikeMove.stopDistance(target) + 0.3
-				? Mth.clamp(Mth.ceil((dist - StrikeMove.stopDistance(target)) / FreeflowConfig.lungeSpeed), 1, 3) : 0;
+				? Mth.clamp(Mth.ceil((dist - StrikeMove.stopDistance(target)) / FreeflowConfig.lungeSpeed), 1,
+				FreeflowConfig.maxLungeTicks) : 0;
 		StrikeMove.send(player, target.getId(), travel);
 		EnemyStatus.event(player, CombatEventPayload.Type.TAKEDOWN_START, target, FreeflowConfig.groundTakedownTicks);
 		return true;
