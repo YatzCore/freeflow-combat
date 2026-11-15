@@ -41,6 +41,16 @@ public final class CombatStateManager {
 			}
 			return true;
 		});
+
+		// Getting hit breaks the combo.
+		ServerLivingEntityEvents.AFTER_DAMAGE.register((entity, source, baseDamage, damageTaken, blocked) -> {
+			if (entity instanceof ServerPlayer player && damageTaken > 0.0f && !blocked) {
+				CombatState state = STATES.get(player.getUUID());
+				if (state != null) {
+					ComboTracker.breakCombo(player, state);
+				}
+			}
+		});
 	}
 
 	public static CombatState get(ServerPlayer player) {
@@ -57,6 +67,10 @@ public final class CombatStateManager {
 			}
 		} else {
 			state.clearMoves();
+			ComboTracker.breakCombo(player, state);
+			if (!state.inCombat) {
+				state.maxCombo = 0; // fight over
+			}
 		}
 
 		if (state.dirty) {
@@ -76,6 +90,9 @@ public final class CombatStateManager {
 		} else if (action.requiresFreeflow()) {
 			if (!CombatModeTracker.isFreeflowActive(player, state)) {
 				return; // stale/forged input: ignore
+			}
+			if (player.level().getGameTime() < state.staggerUntil) {
+				return; // staggered: every move is locked out
 			}
 			Move move = MoveRegistry.get(action);
 			if (move != null && !move.execute(player, state, payload)) {

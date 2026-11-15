@@ -1,5 +1,6 @@
 package com.borislav.freeflow.combat.moves;
 
+import com.borislav.freeflow.combat.ComboTracker;
 import com.borislav.freeflow.combat.CombatModeTracker;
 import com.borislav.freeflow.combat.CombatState;
 import com.borislav.freeflow.combat.Directions;
@@ -30,8 +31,17 @@ public class StrikeMove implements Move {
 	@Override
 	public boolean execute(ServerPlayer player, CombatState state, CombatInputPayload input) {
 		long now = player.level().getGameTime();
+		if (now < state.staggerUntil) {
+			return false; // staggered: presses are ignored
+		}
 		if (state.strikeHitTick >= 0 || now < state.nextStrikeTick) {
-			state.bufferedStrike = input; // busy: keep the latest press
+			// Busy. On-beat = during recovery or just before the current hit lands.
+			boolean onBeat = state.strikeHitTick < 0 || state.strikeHitTick - now <= FreeflowConfig.rhythmWindowTicks;
+			if (!onBeat && ++state.earlyPresses >= FreeflowConfig.rhythmSpamLimit) {
+				ComboTracker.stagger(player, state); // button mashing
+				return true;
+			}
+			state.bufferedStrike = input; // keep the latest press
 			return true;
 		}
 		start(player, state, input, now);
@@ -45,10 +55,18 @@ public class StrikeMove implements Move {
 		if (state.strikeHitTick >= 0 && now >= state.strikeHitTick) {
 			state.strikeHitTick = -1;
 			boolean hit = resolveHit(player, state);
-			state.nextStrikeTick = now + (hit ? FreeflowConfig.strikeRecoveryTicks : FreeflowConfig.whiffRecoveryTicks);
+			if (hit) {
+				ComboTracker.onHit(player, state);
+				state.nextStrikeTick = now + ComboTracker.recoveryTicks(state);
+			} else {
+				ComboTracker.breakCombo(player, state);
+				state.nextStrikeTick = now + FreeflowConfig.whiffRecoveryTicks;
+			}
 		}
+		ComboTracker.tick(player, state);
 
-		if (state.bufferedStrike != null && state.strikeHitTick < 0 && now >= state.nextStrikeTick) {
+		if (state.bufferedStrike != null && state.strikeHitTick < 0 && now >= state.nextStrikeTick
+				&& now >= state.staggerUntil) {
 			CombatInputPayload buffered = state.bufferedStrike;
 			state.bufferedStrike = null;
 			if (CombatModeTracker.isFreeflowActive(player, state)) {
@@ -59,14 +77,16 @@ public class StrikeMove implements Move {
 
 	private static void start(ServerPlayer player, CombatState state, CombatInputPayload input, long now) {
 		state.strikeIndex++;
+		state.earlyPresses = 0;
 		InteractionHand hand = state.strikeIndex % 2 == 0 ? InteractionHand.MAIN_HAND : InteractionHand.OFF_HAND;
 		player.swing(hand, true);
 
 		Mob target = TargetSelector.select(player, input.aimYaw(), input.forward(), input.strafe(),
-				FreeflowConfig.strikeRange);
+				ComboTracker.range(state));
 		if (target == null) {
 			state.strikeTarget = null;
 			state.nextStrikeTick = now + FreeflowConfig.whiffRecoveryTicks;
+			ComboTracker.breakCombo(player, state); // swinging at air breaks the flow
 			send(player, -1, 0);
 			return;
 		}
@@ -96,7 +116,7 @@ public class StrikeMove implements Move {
 		}
 
 		target.invulnerableTime = 0; // freeflow hits are faster than vanilla i-frames
-		boolean hurt = target.hurt(player.damageSources().playerAttack(player), FreeflowConfig.strikeDamage);
+		boolean hurt = target.hurt(player.damageSources().playerAttack(player), ComboTracker.damage(state));
 		if (!hurt) {
 			return false;
 		}

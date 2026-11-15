@@ -12,7 +12,7 @@ import net.minecraft.client.gui.GuiGraphics;
 public final class DebugOverlay {
 	private DebugOverlay() {}
 
-	public static boolean enabled = true;
+	public static boolean enabled = false; // F7 to show
 
 	public static void render(GuiGraphics graphics, DeltaTracker delta) {
 		Minecraft mc = Minecraft.getInstance();

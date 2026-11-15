@@ -43,6 +43,26 @@ public final class FreeflowConfig {
 	/** Extra distance tolerated at hit time (lag / prediction error). */
 	public static double hitValidationSlack = 2.5;
 
+	// --- Combo & rhythm ---
+
+	/** Ticks without a hit before the combo breaks (30 = 1.5s). */
+	public static int comboTimeoutTicks = 30;
+	/** Combo count at which scaling stops growing. */
+	public static int comboScalingCap = 20;
+	/** Extra damage per combo hit (0.05 = +5%, so x20 = double damage). */
+	public static float comboDamagePerHit = 0.05f;
+	/** Extra strike range (blocks) per combo hit (x20 = 8 + 4 = 12 blocks). */
+	public static double comboRangePerHit = 0.2;
+	/** Every this many combo hits, the post-hit recovery gets one tick shorter (faster flow). */
+	public static int comboRecoveryStep = 10;
+	/** A press counts as "on beat" if it comes within this many ticks before the current hit lands (or during recovery). */
+	public static int rhythmWindowTicks = 3;
+	/** Early (off-beat) presses tolerated during one strike before the player staggers. */
+	public static int rhythmSpamLimit = 2;
+	/** Stagger duration in ticks (8 = 0.4s); inputs are ignored meanwhile. */
+	public static int staggerTicks = 8;
+	public static boolean staggerBreaksCombo = true;
+
 	// --- Camera (client) ---
 
 	/** Master switch for the over-the-shoulder combat camera. */

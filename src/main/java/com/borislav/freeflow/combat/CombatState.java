@@ -34,11 +34,23 @@ public class CombatState {
 	public CombatInputPayload bufferedStrike;
 	public int strikeIndex = 0;
 
+	// --- Combo & rhythm ---
+	public int combo = 0;
+	/** Best combo of the current fight (for end-of-fight scoring later). */
+	public int maxCombo = 0;
+	/** Game tick of the last combo hit. */
+	public long lastComboTick = 0;
+	/** Off-beat presses during the current strike. */
+	public int earlyPresses = 0;
+	/** Inputs are ignored until this game tick. */
+	public long staggerUntil = 0;
+
 	/** Cancels everything in flight (combat ended, mode changed, death...). */
 	public void clearMoves() {
 		strikeTarget = null;
 		strikeHitTick = -1;
 		bufferedStrike = null;
+		earlyPresses = 0;
 	}
 
 	/** Set whenever a synced field changes; the manager sends a sync packet and clears it. */

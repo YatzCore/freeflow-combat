@@ -153,4 +153,118 @@ public class FreeflowGameTests implements FabricGameTest {
 			h.succeed();
 		});
 	}
+
+	// --- Milestone 5: combo & rhythm ---
+
+	@GameTest(template = EMPTY_STRUCTURE)
+	public void comboCountsLandedHits(GameTestHelper h) {
+		ServerPlayer p = player(h, CombatMode.FORCED_ON);
+		zombie(h, 2.5, 4.0);
+		CombatState state = CombatStateManager.get(p);
+
+		strike(p, FACING_PLUS_Z, 0, 0);
+		h.runAfterDelay(6, () -> strike(p, FACING_PLUS_Z, 0, 0));
+		h.succeedWhen(() -> h.assertTrue(state.combo == 2, "combo should be 2 after two hits, was " + state.combo));
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE, timeoutTicks = 80)
+	public void comboBreaksAfterTimeout(GameTestHelper h) {
+		ServerPlayer p = player(h, CombatMode.FORCED_ON);
+		zombie(h, 2.5, 4.0);
+		CombatState state = CombatStateManager.get(p);
+
+		strike(p, FACING_PLUS_Z, 0, 0);
+		h.runAfterDelay(5, () -> h.assertTrue(state.combo == 1, "combo should be 1 after a hit"));
+		h.runAfterDelay(45, () -> {
+			h.assertTrue(state.combo == 0, "combo should time out after 1.5s without hits");
+			h.assertTrue(state.maxCombo == 1, "max combo should remember the best combo of the fight");
+			h.succeed();
+		});
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE)
+	public void whiffBreaksCombo(GameTestHelper h) {
+		ServerPlayer p = player(h, CombatMode.FORCED_ON);
+		CombatState state = CombatStateManager.get(p);
+		state.combo = 5;
+		state.lastComboTick = h.getLevel().getGameTime();
+
+		strike(p, FACING_PLUS_Z, 0, 0); // nothing to hit
+		h.assertTrue(state.combo == 0, "striking at air should break the combo");
+		h.succeed();
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE)
+	public void onBeatPressIsBuffered(GameTestHelper h) {
+		ServerPlayer p = player(h, CombatMode.FORCED_ON);
+		zombie(h, 2.5, 4.0); // adjacent: hit lands next tick, so a press now is on-beat
+		CombatState state = CombatStateManager.get(p);
+
+		strike(p, FACING_PLUS_Z, 0, 0);
+		strike(p, FACING_PLUS_Z, 0, 0);
+		h.assertTrue(state.bufferedStrike != null, "on-beat press should be buffered");
+		h.assertTrue(state.staggerUntil <= h.getLevel().getGameTime(), "on-beat press must not stagger");
+		h.succeed();
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE)
+	public void mashingCausesStagger(GameTestHelper h) {
+		ServerPlayer p = player(h, CombatMode.FORCED_ON);
+		Vec3 start = h.absoluteVec(new Vec3(2.5, 1, 0.5));
+		p.moveTo(start.x, start.y, start.z, FACING_PLUS_Z, 0.0f);
+		zombie(h, 2.5, 7.5); // 7 blocks: a 4-tick lunge, so presses right away are off-beat
+		CombatState state = CombatStateManager.get(p);
+
+		strike(p, FACING_PLUS_Z, 1.0f, 0);
+		h.assertTrue(state.strikeHitTick - h.getLevel().getGameTime() > 3, "lunge should be long enough to be off-beat");
+		strike(p, FACING_PLUS_Z, 1.0f, 0);
+		strike(p, FACING_PLUS_Z, 1.0f, 0);
+		h.assertTrue(state.staggerUntil > h.getLevel().getGameTime(), "mashing should stagger the player");
+		h.assertTrue(state.bufferedStrike == null, "stagger should drop the buffered press");
+
+		int acked = state.acceptedInputs;
+		strike(p, FACING_PLUS_Z, 1.0f, 0);
+		h.assertTrue(state.acceptedInputs == acked, "inputs during a stagger should be ignored");
+		h.succeed();
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE)
+	public void damageScalesWithCombo(GameTestHelper h) {
+		ServerPlayer p = player(h, CombatMode.FORCED_ON);
+		CombatState state = CombatStateManager.get(p);
+		Zombie first = zombie(h, 2.5, 4.0);
+		float firstHp = first.getHealth();
+
+		strike(p, FACING_PLUS_Z, 0, 0); // combo 0 hit
+		h.runAfterDelay(4, () -> {
+			float lossAtZero = firstHp - first.getHealth();
+			h.assertTrue(lossAtZero > 0, "first hit should land");
+			first.discard();
+
+			Zombie second = zombie(h, 2.5, 4.0);
+			float secondHp = second.getHealth();
+			state.combo = 10;
+			state.lastComboTick = h.getLevel().getGameTime();
+			state.nextStrikeTick = 0;
+			strike(p, FACING_PLUS_Z, 0, 0); // combo 10 hit: +50% damage
+			h.runAfterDelay(4, () -> {
+				float lossAtTen = secondHp - second.getHealth();
+				h.assertTrue(lossAtTen > lossAtZero * 1.3f,
+						String.format("combo x10 should hit harder (%.2f vs %.2f)", lossAtTen, lossAtZero));
+				h.succeed();
+			});
+		});
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE)
+	public void takingDamageBreaksCombo(GameTestHelper h) {
+		ServerPlayer p = player(h, CombatMode.FORCED_ON);
+		CombatState state = CombatStateManager.get(p);
+		state.combo = 5;
+		state.lastComboTick = h.getLevel().getGameTime();
+
+		ServerLivingEntityEvents.AFTER_DAMAGE.invoker().afterDamage(p, p.damageSources().generic(), 2.0f, 2.0f, false);
+		h.assertTrue(state.combo == 0, "getting hit should break the combo");
+		h.succeed();
+	}
 }
