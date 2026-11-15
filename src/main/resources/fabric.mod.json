@@ -1,0 +1,33 @@
+{
+	"schemaVersion": 1,
+	"id": "freeflow",
+	"version": "${version}",
+	"name": "Freeflow Combat",
+	"description": "Rhythm-based freeflow melee combat: target snapping, combos, counters, evades and takedowns.",
+	"authors": ["Borislav"],
+	"contact": {},
+	"license": "All-Rights-Reserved",
+	"environment": "*",
+	"entrypoints": {
+		"main": ["com.borislav.freeflow.FreeflowMod"],
+		"client": ["com.borislav.freeflow.client.FreeflowClient"]
+	},
+	"mixins": [
+		"freeflow.mixins.json",
+		{
+			"config": "freeflow.client.mixins.json",
+			"environment": "client"
+		}
+	],
+	"depends": {
+		"fabricloader": ">=0.16.0",
+		"minecraft": "~1.21.1",
+		"java": ">=21",
+		"fabric-api": "*",
+		"playeranimator": "*",
+		"cloth-config": "*"
+	},
+	"suggests": {
+		"modmenu": "*"
+	}
+}
