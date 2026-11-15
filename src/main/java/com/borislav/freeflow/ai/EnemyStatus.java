@@ -16,6 +16,9 @@ public final class EnemyStatus {
 	/** Dazes the enemy: cancels its attack, it can't move much or attack for {@code ticks}. */
 	public static void stun(ServerPlayer player, CombatState state, Mob mob, int ticks) {
 		long now = player.level().getGameTime();
+		if (isBoss(mob)) {
+			ticks = Math.max(1, Math.round(ticks * FreeflowConfig.bossStunMultiplier));
+		}
 		EnemySlot slot = CombatDirector.slot(state, mob);
 		cancelAttack(player, slot);
 		slot.stunnedUntil = Math.max(slot.stunnedUntil, now + ticks);
@@ -28,6 +31,10 @@ public final class EnemyStatus {
 	public static void knockDown(ServerPlayer player, CombatState state, Mob mob, int ticks) {
 		long now = player.level().getGameTime();
 		EnemySlot slot = CombatDirector.slot(state, mob);
+		if (isBoss(mob)) {
+			slot.beatdownHits = 0; // bosses can't be knocked down
+			return;
+		}
 		cancelAttack(player, slot);
 		slot.knockedDownUntil = now + ticks;
 		slot.stunnedUntil = 0;
@@ -38,7 +45,17 @@ public final class EnemyStatus {
 	}
 
 	public static boolean isBoss(Mob mob) {
-		return mob.getMaxHealth() > FreeflowConfig.bossHealthThreshold;
+		return EnemyRole.of(mob) == EnemyRole.BOSS;
+	}
+
+	/** True if a shielded enemy blocks a strike from {@code player} (not stunned, attacked from the front). */
+	public static boolean shieldBlocks(ServerPlayer player, Mob mob, boolean stunned) {
+		if (stunned || EnemyRole.of(mob) != EnemyRole.SHIELDED) {
+			return false;
+		}
+		float toPlayer = com.borislav.freeflow.combat.Directions.yawTo(mob, player);
+		double angle = Math.abs(net.minecraft.util.Mth.wrapDegrees(toPlayer - mob.yBodyRot));
+		return angle <= FreeflowConfig.shieldBlockAngle;
 	}
 
 	/** Takedown damage: knocks out normal enemies, heavy damage to bosses. */

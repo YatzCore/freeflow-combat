@@ -1,5 +1,6 @@
 package com.borislav.freeflow.combat;
 
+import com.borislav.freeflow.ai.EnemyRole;
 import com.borislav.freeflow.config.FreeflowConfig;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
@@ -26,8 +27,8 @@ public final class TargetSelector {
 		for (Mob mob : player.level().getEntitiesOfClass(Mob.class, player.getBoundingBox().inflate(range),
 				mob -> isValidTarget(player, mob))) {
 			double dist = Directions.horizontalDistance(player, mob);
-			if (dist > range) {
-				continue;
+			if (dist > range || (dist > FreeflowConfig.bossSnapRange && EnemyRole.of(mob) == EnemyRole.BOSS)) {
+				continue; // bosses only snap from close by
 			}
 			double angle = Math.abs(Mth.wrapDegrees(Directions.yawTo(player, mob) - desiredYaw));
 			boolean inCone = angle <= cone;

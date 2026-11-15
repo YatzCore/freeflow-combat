@@ -37,6 +37,9 @@ import org.jetbrains.annotations.Nullable;
  */
 public class StrikeMove implements Move {
 
+	/** resolveHit result: the strike bounced off a shield. */
+	private static final int BLOCKED = -2;
+
 	@Override
 	public boolean execute(ServerPlayer player, CombatState state, CombatInputPayload input) {
 		long now = player.level().getGameTime();
@@ -69,6 +72,8 @@ public class StrikeMove implements Move {
 			if (recovery >= 0) {
 				ComboTracker.onHit(player, state);
 				state.nextStrikeTick = now + recovery;
+			} else if (recovery == BLOCKED) {
+				state.nextStrikeTick = now + FreeflowConfig.shieldRecoilTicks; // bounced: combo kept, no gain
 			} else {
 				ComboTracker.breakCombo(player, state);
 				state.nextStrikeTick = now + FreeflowConfig.whiffRecoveryTicks;
@@ -169,6 +174,16 @@ public class StrikeMove implements Move {
 
 		EnemySlot slot = CombatDirector.slot(state, target);
 		boolean beatdown = now < slot.stunnedUntil && !slot.isKnockedDown(now);
+		if (EnemyStatus.shieldBlocks(player, target, beatdown)) {
+			// Bounced off the shield: recoil. Stun it first, or vault over and hit it from behind.
+			state.staggerUntil = now + FreeflowConfig.shieldRecoilTicks;
+			state.bufferedStrike = null;
+			level.playSound(null, target.getX(), target.getY(), target.getZ(), SoundEvents.SHIELD_BLOCK,
+					SoundSource.PLAYERS, 1.0f, 0.9f);
+			EnemyStatus.event(player, CombatEventPayload.Type.BLOCKED, target, FreeflowConfig.shieldRecoilTicks);
+			return BLOCKED;
+		}
+
 		float damage = beatdown
 				? FreeflowConfig.beatdownDamage * ComboTracker.damage(state) / FreeflowConfig.strikeDamage
 				: ComboTracker.damage(state);

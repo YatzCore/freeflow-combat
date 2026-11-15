@@ -73,6 +73,13 @@ public final class ClientCombo {
 				flash("INTERRUPTED", 0x9A9A9A);
 			}
 			case SPECIAL_TAKEDOWN -> flash("SPECIAL TAKEDOWN", 0xFF4A3D);
+			case BLOCKED -> {
+				flash("BLOCKED - STUN IT OR HIT FROM BEHIND", 0x9AB8FF);
+				staggerUntilTick = clientTick + payload.ticks();
+				strikeLandTick = -1;
+			}
+			case DEFLECT -> onCounter(1);
+			case CANT_COUNTER -> flash("CAN'T COUNTER - EVADE!", 0xFF3B30);
 			default -> {}
 		}
 	}

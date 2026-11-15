@@ -12,7 +12,13 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
  */
 public record CombatEventPayload(Type event, int mobId, int ticks) implements CustomPacketPayload {
 	public enum Type {
-		STUN, STUN_END, KNOCKDOWN, TAKEDOWN_START, TAKEDOWN, TAKEDOWN_INTERRUPTED, SPECIAL_TAKEDOWN;
+		STUN, STUN_END, KNOCKDOWN, TAKEDOWN_START, TAKEDOWN, TAKEDOWN_INTERRUPTED, SPECIAL_TAKEDOWN,
+		/** Strike bounced off a shield. */
+		BLOCKED,
+		/** Counter deflected a ranged shot. */
+		DEFLECT,
+		/** Counter pressed but the only attacks coming are armed (uncounterable). */
+		CANT_COUNTER;
 
 		static Type byId(int id) {
 			Type[] v = values();

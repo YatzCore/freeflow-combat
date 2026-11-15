@@ -3,7 +3,10 @@
 	"package": "com.borislav.freeflow.mixin",
 	"compatibilityLevel": "JAVA_21",
 	"mixins": [
-		"MeleeAttackGoalMixin"
+		"MeleeAttackGoalMixin",
+		"MobMixin",
+		"RangedBowAttackGoalMixin",
+		"RangedCrossbowAttackGoalMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

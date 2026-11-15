@@ -7,6 +7,10 @@ public class EnemySlot {
 	public final Mob mob;
 	/** Game tick the telegraphed attack lands, or -1 if not attacking. */
 	public long attackAt = -1;
+	/** The pending attack is a ranged shot. */
+	public boolean ranged = false;
+	/** Telegraph kind of the pending attack (see {@link EnemyRole#telegraphKind()}). */
+	public int kind = 0;
 	/** Earliest tick this enemy may start another attack. */
 	public long nextAllowed = 0;
 	/** Enemy is stunned (countered / stunned / beaten down) until this tick: it can't attack. */

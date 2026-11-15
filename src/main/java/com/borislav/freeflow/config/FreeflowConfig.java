@@ -133,6 +133,24 @@ public final class FreeflowConfig {
 	public static float bossHealthThreshold = 50.0f;
 	public static float bossTakedownDamage = 12.0f;
 
+	// --- Enemy roles ---
+
+	/** Mobs holding a sword or axe count as ARMED (uncounterable attacks). */
+	public static boolean armedFromHeldWeapons = true;
+	/** Recoil (ticks) when a strike bounces off a shield. */
+	public static int shieldRecoilTicks = 8;
+	/** A shield blocks strikes coming from within this angle of the enemy's facing. */
+	public static double shieldBlockAngle = 100.0;
+	/** Ranged enemies allowed to have a shot lined up at the same time. */
+	public static int maxSimultaneousShooters = 2;
+	/** Warning time before a ranged shot (longer than melee: easier to read). */
+	public static int rangedTelegraphTicks = 16;
+	public static int rangedCooldownMin = 40;
+	public static int rangedCooldownMax = 80;
+	/** Bosses: stun duration multiplier and max strike snap distance. */
+	public static float bossStunMultiplier = 0.25f;
+	public static double bossSnapRange = 4.0;
+
 	// --- Camera (client) ---
 
 	/** Master switch for the over-the-shoulder combat camera. */

@@ -1,7 +1,9 @@
 package com.borislav.freeflow.test;
 
 import com.borislav.freeflow.ai.CombatDirector;
+import com.borislav.freeflow.ai.EnemyRole;
 import com.borislav.freeflow.ai.EnemySlot;
+import com.borislav.freeflow.network.TelegraphPayload;
 import com.borislav.freeflow.ai.EnemyStatus;
 import com.borislav.freeflow.combat.CombatAction;
 import com.borislav.freeflow.combat.CombatMode;
@@ -19,8 +21,14 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.animal.IronGolem;
+import net.minecraft.world.entity.monster.Pillager;
+import net.minecraft.world.entity.monster.Skeleton;
+import net.minecraft.world.entity.monster.Vindicator;
 import net.minecraft.world.entity.monster.Zombie;
+import net.minecraft.world.entity.monster.piglin.Piglin;
+import net.minecraft.world.entity.projectile.AbstractArrow;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.phys.Vec3;
 
@@ -611,6 +619,153 @@ public class FreeflowGameTests implements FabricGameTest {
 		h.assertTrue(EnemyStatus.isBoss(golem), "an iron golem (100 hp) counts as a boss");
 		EnemyStatus.knockOut(p, golem);
 		h.assertTrue(golem.isAlive(), "bosses only take heavy damage from takedowns");
+		h.succeed();
+	}
+
+	// --- Milestone 9: enemy roles ---
+
+	private static <T extends Mob> T still(T mob, float yaw) {
+		mob.setNoAi(true);
+		mob.setNoGravity(true);
+		mob.setYRot(yaw);
+		mob.setYHeadRot(yaw);
+		mob.setYBodyRot(yaw);
+		mob.setItemSlot(EquipmentSlot.HEAD, new ItemStack(Items.LEATHER_HELMET)); // no sun burning
+		return mob;
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE)
+	public void rolesComeFromTagsAndGear(GameTestHelper h) {
+		Zombie plain = still(h.spawn(EntityType.ZOMBIE, 1.5f, 1, 1.5f), 0);
+		Zombie shielded = still(h.spawn(EntityType.ZOMBIE, 3.5f, 1, 1.5f), 0);
+		shielded.setItemSlot(EquipmentSlot.OFFHAND, new ItemStack(Items.SHIELD));
+		Zombie withSword = still(h.spawn(EntityType.ZOMBIE, 5.5f, 1, 1.5f), 0);
+		withSword.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(Items.IRON_SWORD));
+		Vindicator vindicator = still(h.spawn(EntityType.VINDICATOR, 1.5f, 1, 4.5f), 0);
+		Skeleton skeleton = still(h.spawn(EntityType.SKELETON, 3.5f, 1, 4.5f), 0);
+		IronGolem golem = still(h.spawn(EntityType.IRON_GOLEM, 5.5f, 1, 5.5f), 0);
+		// Spawning a pillager also loads RangedCrossbowAttackGoal, so its mixin is verified here.
+		Pillager pillager = still(h.spawn(EntityType.PILLAGER, 1.5f, 1, 6.5f), 0);
+		h.assertTrue(EnemyRole.of(pillager) == EnemyRole.RANGED, "pillager is RANGED (tag)");
+
+		h.assertTrue(EnemyRole.of(plain) == EnemyRole.NORMAL, "plain zombie is NORMAL");
+		h.assertTrue(EnemyRole.of(shielded) == EnemyRole.SHIELDED, "zombie with a shield is SHIELDED");
+		h.assertTrue(EnemyRole.of(withSword) == EnemyRole.ARMED, "zombie with a sword is ARMED");
+		h.assertTrue(EnemyRole.of(vindicator) == EnemyRole.ARMED, "vindicator is ARMED (tag)");
+		h.assertTrue(EnemyRole.of(skeleton) == EnemyRole.RANGED, "skeleton is RANGED (tag)");
+		h.assertTrue(EnemyRole.of(golem) == EnemyRole.BOSS, "iron golem is a BOSS (tag)");
+		h.succeed();
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE, timeoutTicks = 40)
+	public void shieldBlocksStrikeFromTheFront(GameTestHelper h) {
+		ServerPlayer p = player(h, CombatMode.FORCED_ON);
+		Zombie z = still(h.spawn(EntityType.ZOMBIE, 2.5f, 1, 4.0f), 180.0f); // facing the player (-Z)
+		z.setItemSlot(EquipmentSlot.OFFHAND, new ItemStack(Items.SHIELD));
+		CombatState state = CombatStateManager.get(p);
+		float hp = z.getHealth();
+
+		strike(p, FACING_PLUS_Z, 0, 0);
+		h.runAfterDelay(5, () -> {
+			h.assertTrue(z.getHealth() == hp, "a frontal strike should bounce off the shield");
+			h.assertTrue(state.staggerUntil > state.lastComboTick, "bouncing off a shield makes the player recoil");
+			h.succeed();
+		});
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE, timeoutTicks = 40)
+	public void shieldDoesNotBlockFromBehind(GameTestHelper h) {
+		ServerPlayer p = player(h, CombatMode.FORCED_ON);
+		Zombie z = still(h.spawn(EntityType.ZOMBIE, 2.5f, 1, 4.0f), 0.0f); // facing away (+Z)
+		z.setItemSlot(EquipmentSlot.OFFHAND, new ItemStack(Items.SHIELD));
+		float hp = z.getHealth();
+
+		strike(p, FACING_PLUS_Z, 0, 0);
+		h.succeedWhen(() -> h.assertTrue(z.getHealth() < hp, "a strike from behind should land"));
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE, timeoutTicks = 40)
+	public void stunnedShieldCanBeBeatenDown(GameTestHelper h) {
+		ServerPlayer p = player(h, CombatMode.FORCED_ON);
+		Zombie z = still(h.spawn(EntityType.ZOMBIE, 2.5f, 1, 4.0f), 180.0f);
+		z.setItemSlot(EquipmentSlot.OFFHAND, new ItemStack(Items.SHIELD));
+		float hp = z.getHealth();
+
+		act(p, CombatAction.STUN);
+		strike(p, FACING_PLUS_Z, 0, 0);
+		h.succeedWhen(() -> h.assertTrue(z.getHealth() < hp, "a stunned shield enemy can be hit from the front"));
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE)
+	public void armedAttackCantBeCountered(GameTestHelper h) {
+		ServerPlayer p = player(h, CombatMode.FORCED_ON);
+		Vindicator v = still(h.spawn(EntityType.VINDICATOR, 2.5f, 1, 3.5f), 180.0f);
+		CombatState state = CombatStateManager.get(p);
+
+		h.assertTrue(CombatDirector.requestAttack(p, v), "vindicator should get a turn");
+		EnemySlot slot = state.enemies.get(v.getId());
+		h.assertTrue(slot.kind == TelegraphPayload.ARMED, "armed attack should have the red telegraph");
+		counter(p);
+		h.assertTrue(slot.isTelegraphing(), "an armed attack can't be countered");
+		h.assertTrue(state.counterCooldownUntil > h.getLevel().getGameTime(), "failed counter locks out");
+		h.succeed();
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE, timeoutTicks = 60)
+	public void rangedShotIsTelegraphedAndFires(GameTestHelper h) {
+		ServerPlayer p = player(h, CombatMode.FORCED_ON);
+		Skeleton s = still(h.spawn(EntityType.SKELETON, 2.5f, 1, 7.5f), 180.0f);
+		s.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(Items.BOW));
+		CombatState state = CombatStateManager.get(p);
+
+		h.assertTrue(CombatDirector.requestRangedAttack(p, s), "skeleton should get a shooting turn");
+		EnemySlot slot = state.enemies.get(s.getId());
+		h.assertTrue(slot.ranged && slot.kind == TelegraphPayload.RANGED, "shot should have the ranged telegraph");
+		h.assertTrue(!CombatDirector.requestRangedAttack(p, s), "no second shot while one is lined up");
+		h.succeedWhen(() -> h.assertTrue(
+				!h.getLevel().getEntitiesOfClass(AbstractArrow.class, p.getBoundingBox().inflate(12)).isEmpty(),
+				"the skeleton should fire when the warning ends"));
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE)
+	public void counterDeflectsRangedShot(GameTestHelper h) {
+		ServerPlayer p = player(h, CombatMode.FORCED_ON);
+		Skeleton s = still(h.spawn(EntityType.SKELETON, 2.5f, 1, 7.5f), 180.0f);
+		CombatState state = CombatStateManager.get(p);
+
+		CombatDirector.requestRangedAttack(p, s); // 5 blocks away: outside melee counter range
+		counter(p);
+		EnemySlot slot = state.enemies.get(s.getId());
+		h.assertTrue(!slot.isTelegraphing(), "counter should deflect a ranged shot at any distance");
+		h.assertTrue(state.combo == 1, "a deflect counts toward the combo");
+		h.succeed();
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE, timeoutTicks = 60)
+	public void piglinsTakeTurnsToo(GameTestHelper h) {
+		ServerPlayer p = player(h, CombatMode.FORCED_ON);
+		Piglin piglin = still(h.spawn(EntityType.PIGLIN, 2.5f, 1, 3.5f), 180.0f);
+		CombatState state = CombatStateManager.get(p);
+
+		h.assertTrue(!piglin.doHurtTarget(p), "a piglin's direct hit should become a turn request");
+		EnemySlot slot = state.enemies.get(piglin.getId());
+		h.assertTrue(slot != null && slot.isTelegraphing(), "the piglin's attack should be telegraphed");
+		h.succeedWhen(() -> h.assertTrue(!slot.isTelegraphing() && piglin.swinging,
+				"the director should perform the piglin's attack after the warning"));
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE)
+	public void bossesGetShortStunsAndNoKnockdown(GameTestHelper h) {
+		ServerPlayer p = player(h, CombatMode.FORCED_ON);
+		IronGolem golem = still(h.spawn(EntityType.IRON_GOLEM, 2.5f, 1, 4.5f), 180.0f);
+		CombatState state = CombatStateManager.get(p);
+		long now = h.getLevel().getGameTime();
+
+		EnemyStatus.stun(p, state, golem, 40);
+		EnemySlot slot = state.enemies.get(golem.getId());
+		h.assertTrue(slot.stunnedUntil - now <= 10, "bosses are only stunned briefly");
+		EnemyStatus.knockDown(p, state, golem, 60);
+		h.assertTrue(!slot.isKnockedDown(now), "bosses can't be knocked down");
 		h.succeed();
 	}
 

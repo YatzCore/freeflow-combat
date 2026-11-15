@@ -1,6 +1,9 @@
 package com.borislav.freeflow.combat.moves;
 
+import com.borislav.freeflow.ai.CombatDirector;
 import com.borislav.freeflow.ai.EnemyStatus;
+import com.borislav.freeflow.network.CombatEventPayload;
+import com.borislav.freeflow.network.TelegraphPayload;
 import com.borislav.freeflow.ai.EnemySlot;
 import com.borislav.freeflow.combat.CombatState;
 import com.borislav.freeflow.combat.ComboTracker;
@@ -34,18 +37,37 @@ public class CounterMove implements Move {
 
 		// One press counters one attacker: the one whose hit lands soonest.
 		// Several warnings at once need several presses; any you miss will hit you.
+		// Armed (red) attacks can't be countered; ranged shots are deflected at any distance.
 		EnemySlot target = null;
+		boolean armedIncoming = false;
 		double range = FreeflowConfig.counterRange;
 		for (EnemySlot slot : state.enemies.values()) {
-			if (slot.isTelegraphing() && slot.mob.isAlive() && slot.mob.distanceToSqr(player) <= range * range
-					&& (target == null || slot.attackAt < target.attackAt)) {
+			if (!slot.isTelegraphing() || !slot.mob.isAlive()) {
+				continue;
+			}
+			if (slot.kind == TelegraphPayload.ARMED) {
+				armedIncoming = true;
+				continue;
+			}
+			boolean inReach = slot.ranged || slot.mob.distanceToSqr(player) <= range * range;
+			if (inReach && (target == null || slot.attackAt < target.attackAt)) {
 				target = slot;
 			}
 		}
 
 		if (target == null) {
 			state.counterCooldownUntil = now + FreeflowConfig.counterWhiffTicks;
+			Mob armed = armedIncoming ? firstArmed(state) : null;
+			if (armed != null) {
+				EnemyStatus.event(player, CombatEventPayload.Type.CANT_COUNTER, armed, 0); // "evade it!"
+			}
 			send(player, List.of());
+			return true;
+		}
+
+		if (target.ranged) {
+			deflect(player, state, target, now);
+			send(player, List.of(target.mob.getId()));
 			return true;
 		}
 
@@ -60,6 +82,28 @@ public class CounterMove implements Move {
 		player.swing(InteractionHand.MAIN_HAND, true);
 		send(player, List.of(target.mob.getId()));
 		return true;
+	}
+
+	/** Ranged counter: knock the shot aside. The shooter isn't stunned (it's far away). */
+	private static void deflect(ServerPlayer player, CombatState state, EnemySlot slot, long now) {
+		slot.attackAt = -1;
+		slot.nextAllowed = now + FreeflowConfig.rangedCooldownMin;
+		CombatDirector.sendTelegraph(player, slot.mob, 0);
+		state.invulnerableUntil = Math.max(state.invulnerableUntil, now + 4);
+		ComboTracker.onHit(player, state);
+		player.swing(InteractionHand.OFF_HAND, true);
+		player.serverLevel().playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.SHIELD_BLOCK,
+				SoundSource.PLAYERS, 0.8f, 1.6f);
+		EnemyStatus.event(player, CombatEventPayload.Type.DEFLECT, slot.mob, 0);
+	}
+
+	private static Mob firstArmed(CombatState state) {
+		for (EnemySlot slot : state.enemies.values()) {
+			if (slot.isTelegraphing() && slot.kind == TelegraphPayload.ARMED) {
+				return slot.mob;
+			}
+		}
+		return null;
 	}
 
 	private static void counter(ServerPlayer player, CombatState state, EnemySlot slot, long now) {
