@@ -25,6 +25,7 @@ public final class EnemyStatus {
 		slot.nextAllowed = Math.max(slot.nextAllowed, slot.stunnedUntil + 5);
 		immobilize(mob, ticks, 6);
 		event(player, CombatEventPayload.Type.STUN, mob, (int) (slot.stunnedUntil - now));
+		MobReaction.send(mob, MobReaction.STUNNED, (int) (slot.stunnedUntil - now), player);
 	}
 
 	/** Puts the enemy on the ground: a ground takedown can finish it. */
@@ -42,6 +43,7 @@ public final class EnemyStatus {
 		slot.nextAllowed = Math.max(slot.nextAllowed, slot.knockedDownUntil + 10);
 		immobilize(mob, ticks, 10);
 		event(player, CombatEventPayload.Type.KNOCKDOWN, mob, ticks);
+		MobReaction.send(mob, MobReaction.KNOCKED_DOWN, ticks, player);
 	}
 
 	public static boolean isBoss(Mob mob) {
@@ -63,6 +65,25 @@ public final class EnemyStatus {
 		mob.invulnerableTime = 0;
 		float damage = isBoss(mob) ? FreeflowConfig.bossTakedownDamage : mob.getMaxHealth() * 10.0f + 100.0f;
 		mob.hurt(player.damageSources().playerAttack(player), damage);
+		reactToHit(player, mob, com.borislav.freeflow.combat.Anim.HEAVY);
+	}
+
+	/**
+	 * Enemy body reaction to a landed hit of the given strength: knocked out if it died,
+	 * otherwise head snap (light), stagger (medium) or a backward roll (heavy; bosses stagger).
+	 */
+	public static void reactToHit(ServerPlayer player, Mob mob, int strength) {
+		if (!mob.isAlive()) {
+			MobReaction.send(mob, MobReaction.KNOCKED_OUT, 40, player);
+			return;
+		}
+		MobReaction reaction = switch (strength) {
+			case com.borislav.freeflow.combat.Anim.LIGHT -> MobReaction.HIT_LIGHT;
+			case com.borislav.freeflow.combat.Anim.HEAVY -> isBoss(mob) ? MobReaction.HIT_MEDIUM : MobReaction.LAUNCHED;
+			default -> MobReaction.HIT_MEDIUM;
+		};
+		MobReaction.send(mob, reaction, reaction == MobReaction.LAUNCHED ? 16 : reaction == MobReaction.HIT_MEDIUM ? 10 : 7,
+				player);
 	}
 
 	private static void cancelAttack(ServerPlayer player, EnemySlot slot) {

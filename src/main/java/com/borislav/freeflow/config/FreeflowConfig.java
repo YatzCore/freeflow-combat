@@ -90,6 +90,10 @@ public final class FreeflowConfig {
 	public static int counterStunTicks = 30;
 	/** Lockout after pressing counter with nothing to counter. */
 	public static int counterWhiffTicks = 10;
+	/** Throw counter: how hard the enemy is flung over the player, and how long it stays down. */
+	public static double counterThrowSpeed = 0.75;
+	public static double counterThrowLift = 0.5;
+	public static int counterThrowDownTicks = 40;
 
 	// --- Evade / vault ---
 

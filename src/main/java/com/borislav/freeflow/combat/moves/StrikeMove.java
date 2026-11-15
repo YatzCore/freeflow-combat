@@ -233,6 +233,9 @@ public class StrikeMove implements Move {
 			ImpactFx.knockback(player, target, strength);
 		}
 
+		if (!target.isAlive() || !slot.isKnockedDown(now)) {
+			EnemyStatus.reactToHit(player, target, strength); // a finisher already sent its knockdown fall
+		}
 		ImpactFx.hit(player, target, strength);
 		return recovery;
 	}

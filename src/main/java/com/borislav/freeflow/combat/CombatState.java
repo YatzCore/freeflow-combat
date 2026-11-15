@@ -54,6 +54,9 @@ public class CombatState {
 	public final Map<Integer, EnemySlot> enemies = new HashMap<>();
 	public long lastTelegraphTick = -100;
 	public long counterCooldownUntil = 0;
+	/** Rotates counter variants (strike, kick, throw). */
+	public int counterIndex = 0;
+	public int lastCounterVariant = -1;
 
 	// --- Stun / beatdown / takedowns ---
 	/** Last enemy struck or stunned (beatdowns keep hitting it). */

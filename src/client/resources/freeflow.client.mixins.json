@@ -8,6 +8,7 @@
 		"GameRendererMixin",
 		"EntityTurnMixin",
 		"KeyboardInputMixin",
+		"LivingEntityRendererMixin",
 		"MinecraftMixin"
 	],
 	"injectors": {

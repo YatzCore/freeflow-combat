@@ -2,6 +2,7 @@ package com.borislav.freeflow.combat.moves;
 
 import com.borislav.freeflow.ai.CombatDirector;
 import com.borislav.freeflow.ai.EnemyStatus;
+import com.borislav.freeflow.ai.MobReaction;
 import com.borislav.freeflow.network.CombatEventPayload;
 import com.borislav.freeflow.network.TelegraphPayload;
 import com.borislav.freeflow.ai.EnemySlot;
@@ -19,6 +20,7 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Mob;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.List;
 
@@ -81,7 +83,6 @@ public class CounterMove implements Move {
 		state.nextStrikeTick = now + 4;
 
 		counter(player, state, target, now);
-		Anim.play(player, Anim.COUNTER);
 		player.swing(InteractionHand.MAIN_HAND, true);
 		send(player, List.of(target.mob.getId()));
 		return true;
@@ -109,20 +110,67 @@ public class CounterMove implements Move {
 		return null;
 	}
 
+	/**
+	 * Counter variants rotate so counters don't all look the same (bosses always get the strike):
+	 * <ul>
+	 *   <li>STRIKE: block the arm, punch to the face: the enemy staggers, stunned.</li>
+	 *   <li>KICK: parry, kick to the chest: the enemy is launched back and rolls, stunned.</li>
+	 *   <li>THROW: grab the attacking arm and throw the enemy over your shoulder: it flies over
+	 *       you and lands on its back behind you, knocked down (ground takedown ready).</li>
+	 * </ul>
+	 */
+	public static int chooseVariant(CombatState state, Mob mob) {
+		if (EnemyStatus.isBoss(mob)) {
+			return MobReaction.COUNTER_STRIKE;
+		}
+		return Math.floorMod(state.counterIndex++, 3);
+	}
+
 	private static void counter(ServerPlayer player, CombatState state, EnemySlot slot, long now) {
 		Mob mob = slot.mob;
+		int variant = chooseVariant(state, mob);
+		state.lastCounterVariant = variant;
+
 		mob.invulnerableTime = 0;
 		mob.hurt(player.damageSources().playerAttack(player), FreeflowConfig.counterDamage);
-		mob.knockback(FreeflowConfig.counterKnockback, player.getX() - mob.getX(), player.getZ() - mob.getZ());
-		EnemyStatus.stun(player, state, mob, FreeflowConfig.counterStunTicks); // cancels the attack too
-		slot.nextAllowed = now + FreeflowConfig.counterStunTicks + FreeflowConfig.enemyAttackCooldownMin;
+		int downTicks;
+		switch (variant) {
+			case MobReaction.COUNTER_THROW -> {
+				// Over the shoulder: send it flying over the player to land behind them.
+				Vec3 over = new Vec3(player.getX() - mob.getX(), 0, player.getZ() - mob.getZ()).normalize();
+				mob.setDeltaMovement(over.x * FreeflowConfig.counterThrowSpeed, FreeflowConfig.counterThrowLift,
+						over.z * FreeflowConfig.counterThrowSpeed);
+				mob.hurtMarked = true;
+				EnemyStatus.knockDown(player, state, mob, FreeflowConfig.counterThrowDownTicks);
+				downTicks = FreeflowConfig.counterThrowDownTicks;
+				Anim.play(player, Anim.COUNTER_THROW);
+			}
+			case MobReaction.COUNTER_KICK -> {
+				ImpactFx.knockback(player, mob, Anim.HEAVY);
+				EnemyStatus.stun(player, state, mob, FreeflowConfig.counterStunTicks);
+				downTicks = FreeflowConfig.counterStunTicks;
+				Anim.play(player, Anim.COUNTER_KICK);
+			}
+			default -> {
+				mob.knockback(FreeflowConfig.counterKnockback, player.getX() - mob.getX(), player.getZ() - mob.getZ());
+				EnemyStatus.stun(player, state, mob, FreeflowConfig.counterStunTicks); // cancels the attack too
+				downTicks = FreeflowConfig.counterStunTicks;
+				Anim.play(player, Anim.COUNTER);
+			}
+		}
+		slot.nextAllowed = Math.max(slot.nextAllowed, now + downTicks + FreeflowConfig.enemyAttackCooldownMin);
 		state.lastStrikeMob = mob; // strike right after a counter = beatdown
 		ComboTracker.onHit(player, state);
-		ImpactFx.hit(player, mob, Anim.MEDIUM);
+
+		// Paired enemy animation (sent last so it overrides the generic stun/knockdown pose).
+		if (mob.isAlive()) {
+			MobReaction.send(mob, MobReaction.COUNTERED, downTicks, variant, player);
+		} else {
+			MobReaction.send(mob, MobReaction.KNOCKED_OUT, 40, player);
+		}
+		ImpactFx.hit(player, mob, variant == MobReaction.COUNTER_STRIKE ? Anim.MEDIUM : Anim.HEAVY);
 
 		ServerLevel level = player.serverLevel();
-		level.playSound(null, mob.getX(), mob.getY(), mob.getZ(), SoundEvents.PLAYER_ATTACK_KNOCKBACK,
-				SoundSource.PLAYERS, 1.0f, 1.0f);
 		level.playSound(null, mob.getX(), mob.getY(), mob.getZ(), SoundEvents.SHIELD_BLOCK,
 				SoundSource.PLAYERS, 0.6f, 1.4f);
 		level.sendParticles(ParticleTypes.ENCHANTED_HIT, mob.getX(), mob.getY(0.6), mob.getZ(), 14, 0.3, 0.3, 0.3, 0.3);

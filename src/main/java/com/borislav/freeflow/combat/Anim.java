@@ -35,6 +35,8 @@ public final class Anim {
 	public static final String FINISHER = "finisher";
 	// Other moves
 	public static final String COUNTER = "counter";
+	public static final String COUNTER_KICK = "counter_kick";
+	public static final String COUNTER_THROW = "counter_throw";
 	public static final String STUN = "stun";
 	public static final String EVADE = "evade";
 	public static final String VAULT = "vault";
@@ -43,7 +45,7 @@ public final class Anim {
 
 	public static final List<String> ALL = List.of(JAB_RIGHT, JAB_LEFT, HOOK_RIGHT, HOOK_LEFT, ELBOW, KNEE, FRONT_KICK,
 			ROUNDHOUSE, SPIN_BACKFIST, HAYMAKER, FLYING_KICK, FLYING_KNEE, BEATDOWN_RIGHT, BEATDOWN_LEFT, FINISHER,
-			COUNTER, STUN, EVADE, VAULT, GROUND_TAKEDOWN, SPECIAL_TAKEDOWN);
+			COUNTER, COUNTER_KICK, COUNTER_THROW, STUN, EVADE, VAULT, GROUND_TAKEDOWN, SPECIAL_TAKEDOWN);
 
 	/** Combo strings: the flow gets flashier as the combo grows. */
 	private static final List<String> TIER_LOW = List.of(JAB_RIGHT, JAB_LEFT, HOOK_RIGHT, FRONT_KICK);
@@ -58,7 +60,7 @@ public final class Anim {
 	public static final int HEAVY = 3;
 
 	private static final Set<String> HEAVY_MOVES = Set.of(ROUNDHOUSE, SPIN_BACKFIST, HAYMAKER, FLYING_KICK, FLYING_KNEE,
-			FINISHER, SPECIAL_TAKEDOWN, GROUND_TAKEDOWN);
+			FINISHER, SPECIAL_TAKEDOWN, GROUND_TAKEDOWN, COUNTER_KICK, COUNTER_THROW);
 	private static final Set<String> LIGHT_MOVES = Set.of(JAB_RIGHT, JAB_LEFT, BEATDOWN_RIGHT, BEATDOWN_LEFT);
 
 	/** Picks the strike animation from the lunge length and the combo tier. */

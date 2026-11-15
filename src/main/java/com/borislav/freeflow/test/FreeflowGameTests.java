@@ -849,6 +849,60 @@ public class FreeflowGameTests implements FabricGameTest {
 		h.succeed();
 	}
 
+	// --- Paired counters ---
+
+	@GameTest(template = EMPTY_STRUCTURE)
+	public void counterVariantsRotate(GameTestHelper h) {
+		ServerPlayer p = player(h, CombatMode.FORCED_ON);
+		CombatState state = CombatStateManager.get(p);
+		int[] expected = {com.borislav.freeflow.ai.MobReaction.COUNTER_STRIKE,
+				com.borislav.freeflow.ai.MobReaction.COUNTER_KICK, com.borislav.freeflow.ai.MobReaction.COUNTER_THROW};
+		float[][] spots = {{2.5f, 3.5f}, {3.5f, 2.5f}, {1.5f, 2.5f}};
+		for (int i = 0; i < 3; i++) {
+			Zombie z = zombie(h, spots[i][0], spots[i][1]);
+			state.lastTelegraphTick = -100;
+			state.counterCooldownUntil = 0;
+			CombatDirector.requestAttack(p, z);
+			counter(p);
+			h.assertTrue(state.lastCounterVariant == expected[i],
+					"counter " + i + " should use variant " + expected[i] + ", got " + state.lastCounterVariant);
+			EnemySlot slot = state.enemies.get(z.getId());
+			long now = h.getLevel().getGameTime();
+			if (expected[i] == com.borislav.freeflow.ai.MobReaction.COUNTER_THROW) {
+				h.assertTrue(slot.isKnockedDown(now), "a counter throw leaves the enemy on the ground");
+			} else {
+				h.assertTrue(slot.isStunned(now) && !slot.isKnockedDown(now), "strike/kick counters stun");
+			}
+		}
+		h.succeed();
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE, timeoutTicks = 60)
+	public void counterThrowSendsEnemyOverThePlayer(GameTestHelper h) {
+		ServerPlayer p = player(h, CombatMode.FORCED_ON);
+		Zombie z = h.spawn(EntityType.ZOMBIE, 2.5f, 1.0f, 4.0f); // AI on: it really flies
+		z.setItemSlot(EquipmentSlot.HEAD, new ItemStack(Items.LEATHER_HELMET));
+		CombatState state = CombatStateManager.get(p);
+		state.counterIndex = 2; // next counter is the throw
+
+		CombatDirector.requestAttack(p, z);
+		counter(p);
+		h.assertTrue(state.lastCounterVariant == com.borislav.freeflow.ai.MobReaction.COUNTER_THROW, "should throw");
+		h.succeedWhen(() -> h.assertTrue(z.getZ() < p.getZ() - 0.5,
+				String.format("thrown zombie should land behind the player (zombie z=%.2f, player z=%.2f)", z.getZ(), p.getZ())));
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE)
+	public void bossesAreNeverThrown(GameTestHelper h) {
+		ServerPlayer p = player(h, CombatMode.FORCED_ON);
+		IronGolem golem = still(h.spawn(EntityType.IRON_GOLEM, 2.5f, 1, 4.5f), 180.0f);
+		CombatState state = CombatStateManager.get(p);
+		state.counterIndex = 2;
+		h.assertTrue(com.borislav.freeflow.combat.moves.CounterMove.chooseVariant(state, golem)
+				== com.borislav.freeflow.ai.MobReaction.COUNTER_STRIKE, "bosses only get the strike counter");
+		h.succeed();
+	}
+
 	private static void counter(ServerPlayer p) {
 		CombatStateManager.handleInput(p, new CombatInputPayload(CombatAction.COUNTER, 0, 0, FACING_PLUS_Z));
 	}

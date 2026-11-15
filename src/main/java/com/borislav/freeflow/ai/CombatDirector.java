@@ -94,6 +94,7 @@ public final class CombatDirector {
 		slot.attackAt = now + ticks;
 		state.lastTelegraphTick = now;
 		sendTelegraph(player, mob, ticks, slot.kind);
+		MobReaction.send(mob, MobReaction.WINDUP, ticks, slot.kind, player);
 		return true;
 	}
 
@@ -161,6 +162,7 @@ public final class CombatDirector {
 	}
 
 	private static void strike(ServerPlayer player, Mob mob) {
+		MobReaction.send(mob, MobReaction.ATTACK, 6, player); // the swing plays even if it misses
 		if (!mob.isWithinMeleeAttackRange(player) || !mob.getSensing().hasLineOfSight(player)) {
 			return; // the player got away
 		}
