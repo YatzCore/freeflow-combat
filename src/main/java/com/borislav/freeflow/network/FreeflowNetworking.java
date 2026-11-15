@@ -13,5 +13,6 @@ public final class FreeflowNetworking {
 		PayloadTypeRegistry.playS2C().register(ComboPayload.TYPE, ComboPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(TelegraphPayload.TYPE, TelegraphPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(CounterPayload.TYPE, CounterPayload.CODEC);
+		PayloadTypeRegistry.playS2C().register(EvadePayload.TYPE, EvadePayload.CODEC);
 	}
 }

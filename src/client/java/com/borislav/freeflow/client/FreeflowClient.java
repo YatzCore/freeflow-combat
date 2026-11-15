@@ -8,6 +8,7 @@ import com.borislav.freeflow.client.hud.TelegraphRenderer;
 import com.borislav.freeflow.network.ComboPayload;
 import com.borislav.freeflow.network.CombatSyncPayload;
 import com.borislav.freeflow.network.CounterPayload;
+import com.borislav.freeflow.network.EvadePayload;
 import com.borislav.freeflow.network.StrikeStartPayload;
 import com.borislav.freeflow.network.TelegraphPayload;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
@@ -29,6 +30,7 @@ public class FreeflowClient implements ClientModInitializer {
 		ClientTickEvents.START_CLIENT_TICK.register(client -> {
 			ClientCombo.tick();
 			LungeController.tick(client);
+			EvadeController.tick(client);
 		});
 		ClientTickEvents.END_CLIENT_TICK.register(client -> {
 			ClientInputHandler.tick(client);
@@ -52,8 +54,11 @@ public class FreeflowClient implements ClientModInitializer {
 			LungeController.onCounter(payload.mobIds());
 			ClientCombo.onCounter(payload.mobIds().size());
 		});
+		ClientPlayNetworking.registerGlobalReceiver(EvadePayload.TYPE,
+				(payload, context) -> EvadeController.onEvade(payload));
 		WorldRenderEvents.AFTER_ENTITIES.register(TelegraphRenderer::render);
 		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
+			EvadeController.reset();
 			TelegraphRenderer.reset();
 			FreeflowCamera.exit(client);
 			LungeController.reset();

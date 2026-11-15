@@ -4,6 +4,7 @@ import com.borislav.freeflow.client.camera.FreeflowCamera;
 import com.borislav.freeflow.client.camera.RelativeMovement;
 import com.borislav.freeflow.client.hud.DebugOverlay;
 import com.borislav.freeflow.combat.CombatAction;
+import com.borislav.freeflow.config.FreeflowConfig;
 import com.borislav.freeflow.network.CombatInputPayload;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.KeyMapping;
@@ -40,6 +41,31 @@ public final class ClientInputHandler {
 		pressed(Keybinds.stun, active, CombatAction.STUN);
 		pressed(Keybinds.groundTakedown, active, CombatAction.GROUND_TAKEDOWN);
 		pressed(Keybinds.specialTakedown, active, CombatAction.SPECIAL_TAKEDOWN);
+		checkDoubleTap(client, active);
+	}
+
+	// --- Double-tap a movement key to evade in that direction ---
+
+	/** forward/left input for W, S, A, D. */
+	private static final float[][] TAP_DIRS = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+	private static final boolean[] wasDown = new boolean[4];
+	private static final long[] lastTap = {-100, -100, -100, -100};
+
+	private static void checkDoubleTap(Minecraft client, boolean active) {
+		KeyMapping[] keys = {client.options.keyUp, client.options.keyDown, client.options.keyLeft, client.options.keyRight};
+		long now = ClientCombo.clientTick;
+		for (int i = 0; i < 4; i++) {
+			boolean down = keys[i].isDown();
+			if (down && !wasDown[i]) { // rising edge
+				if (active && FreeflowConfig.doubleTapEvade && now - lastTap[i] <= FreeflowConfig.doubleTapWindowTicks) {
+					send(CombatAction.EVADE, TAP_DIRS[i][0], TAP_DIRS[i][1]);
+					lastTap[i] = -100; // a third tap starts a new pair
+				} else {
+					lastTap[i] = now;
+				}
+			}
+			wasDown[i] = down;
+		}
 	}
 
 	/** Called from the attack-key mixin instead of the vanilla attack. */
@@ -70,6 +96,10 @@ public final class ClientInputHandler {
 	}
 
 	private static void send(CombatAction action) {
+		send(action, RelativeMovement.rawForward, RelativeMovement.rawLeft);
+	}
+
+	private static void send(CombatAction action, float forward, float left) {
 		LocalPlayer player = Minecraft.getInstance().player;
 		if (player == null || !ClientPlayNetworking.canSend(CombatInputPayload.TYPE)) {
 			return; // server doesn't have the mod
@@ -77,7 +107,7 @@ public final class ClientInputHandler {
 		// Direction is sent as raw WASD relative to the aim yaw (camera yaw when orbiting),
 		// so the server can resolve "attack the enemy I'm pushing toward".
 		float aimYaw = FreeflowCamera.isActive() ? FreeflowCamera.yaw() : player.getYRot();
-		ClientPlayNetworking.send(new CombatInputPayload(action, RelativeMovement.rawForward, RelativeMovement.rawLeft, aimYaw));
+		ClientPlayNetworking.send(new CombatInputPayload(action, forward, left, aimYaw));
 		ClientCombatState.lastSentAction = action;
 		ClientCombatState.sentInputs++;
 	}

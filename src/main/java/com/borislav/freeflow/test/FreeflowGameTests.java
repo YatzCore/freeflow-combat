@@ -387,6 +387,71 @@ public class FreeflowGameTests implements FabricGameTest {
 		});
 	}
 
+	// --- Milestone 7: evade & vault ---
+
+	private static void evade(ServerPlayer p, float forward, float left) {
+		CombatStateManager.handleInput(p, new CombatInputPayload(CombatAction.EVADE, forward, left, FACING_PLUS_Z));
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE, timeoutTicks = 40)
+	public void evadeGivesInvulnerability(GameTestHelper h) {
+		ServerPlayer p = player(h, CombatMode.FORCED_ON);
+		Zombie z = zombie(h, 2.5, 6.5);
+		evade(p, 0, 1.0f); // sideways, nothing to vault
+		h.assertTrue(!ServerLivingEntityEvents.ALLOW_DAMAGE.invoker().allowDamage(p, p.damageSources().mobAttack(z), 2.0f),
+				"player should be invulnerable while evading");
+		h.runAfterDelay(15, () -> {
+			h.assertTrue(ServerLivingEntityEvents.ALLOW_DAMAGE.invoker().allowDamage(p, p.damageSources().mobAttack(z), 2.0f),
+					"invulnerability should wear off after the evade");
+			h.succeed();
+		});
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE, timeoutTicks = 40)
+	public void evadeCancelsStrikeAndKeepsCombo(GameTestHelper h) {
+		ServerPlayer p = player(h, CombatMode.FORCED_ON);
+		Zombie z = zombie(h, 2.5, 7.5);
+		CombatState state = CombatStateManager.get(p);
+		state.combo = 5;
+		state.lastComboTick = h.getLevel().getGameTime();
+		float hp = z.getHealth();
+
+		strike(p, FACING_PLUS_Z, 1.0f, 0); // lunge toward the zombie...
+		evade(p, -1.0f, 0);                 // ...then dodge back out of it
+		h.assertTrue(state.strikeHitTick < 0, "evade should cancel the strike in flight");
+		h.assertTrue(state.combo == 5, "evading keeps the combo");
+		h.runAfterDelay(10, () -> {
+			h.assertTrue(z.getHealth() == hp, "a cancelled strike must not land");
+			h.succeed();
+		});
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE)
+	public void evadeHasCooldown(GameTestHelper h) {
+		ServerPlayer p = player(h, CombatMode.FORCED_ON);
+		CombatState state = CombatStateManager.get(p);
+		evade(p, 0, 1.0f);
+		int acked = state.acceptedInputs;
+		evade(p, 0, -1.0f);
+		h.assertTrue(state.acceptedInputs == acked, "a second evade during the cooldown should be ignored");
+		h.succeed();
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE)
+	public void evadeTowardEnemyVaults(GameTestHelper h) {
+		ServerPlayer p = player(h, CombatMode.FORCED_ON);
+		Zombie z = zombie(h, 2.5, 4.5); // 2 blocks ahead
+		CombatState state = CombatStateManager.get(p);
+
+		evade(p, 1.0f, 0); // toward it
+		h.assertTrue(state.lastVaultTarget == z, "evading toward a close enemy should vault over it");
+
+		state.evadeCooldownUntil = 0;
+		evade(p, -1.0f, 0); // away from it
+		h.assertTrue(state.lastVaultTarget == null, "evading away should be a plain evade");
+		h.succeed();
+	}
+
 	private static void counter(ServerPlayer p) {
 		CombatStateManager.handleInput(p, new CombatInputPayload(CombatAction.COUNTER, 0, 0, FACING_PLUS_Z));
 	}

@@ -1,5 +1,6 @@
 package com.borislav.freeflow.client.camera;
 
+import com.borislav.freeflow.client.EvadeController;
 import com.borislav.freeflow.client.LungeController;
 import com.borislav.freeflow.combat.Directions;
 import com.borislav.freeflow.config.FreeflowConfig;
@@ -25,8 +26,8 @@ public final class RelativeMovement {
 		rawForward = input.forwardImpulse;
 		rawLeft = input.leftImpulse;
 
-		if (LungeController.isLunging()) {
-			// The lunge drives movement; WASD must not add to it.
+		if (LungeController.isLunging() || EvadeController.isActive()) {
+			// The lunge/dodge drives movement; WASD must not add to it.
 			input.forwardImpulse = 0.0f;
 			input.leftImpulse = 0.0f;
 			input.up = input.down = input.left = input.right = false;

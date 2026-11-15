@@ -88,6 +88,24 @@ public final class FreeflowConfig {
 	/** Lockout after pressing counter with nothing to counter. */
 	public static int counterWhiffTicks = 10;
 
+	// --- Evade / vault ---
+
+	/** Dodge distance (blocks) and duration (ticks). */
+	public static double evadeDistance = 4.0;
+	public static int evadeTicks = 5;
+	/** Invulnerability after starting an evade or vault. */
+	public static int evadeIframeTicks = 8;
+	public static int evadeCooldownTicks = 12;
+	/** Evading toward an enemy this close (and within the cone) vaults over it instead. */
+	public static double vaultRange = 3.5;
+	public static double vaultCone = 35.0;
+	/** How far past the enemy the vault lands. */
+	public static double vaultLandBehind = 1.8;
+	public static int vaultTicks = 7;
+	/** Double-tapping a movement key evades in that direction (client). */
+	public static boolean doubleTapEvade = true;
+	public static int doubleTapWindowTicks = 6;
+
 	// --- Camera (client) ---
 
 	/** Master switch for the over-the-shoulder combat camera. */

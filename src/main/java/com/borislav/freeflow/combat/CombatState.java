@@ -55,6 +55,12 @@ public class CombatState {
 	public long lastTelegraphTick = -100;
 	public long counterCooldownUntil = 0;
 
+	// --- Evade ---
+	public long evadeCooldownUntil = 0;
+	/** Enemy the last evade vaulted over (null = plain evade). */
+	@Nullable
+	public Mob lastVaultTarget;
+
 	/** Cancels everything in flight (combat ended, mode changed, death...). */
 	public void clearMoves() {
 		strikeTarget = null;
