@@ -28,9 +28,13 @@ public class EvadeMove implements Move {
 	public boolean execute(ServerPlayer player, CombatState state, CombatInputPayload input) {
 		long now = player.level().getGameTime();
 		if (now < state.evadeCooldownUntil) {
-			return false;
+			return false; // still rolling: presses are ignored until the roll animation is over
 		}
+		start(player, state, input, now);
+		return true;
+	}
 
+	private static void start(ServerPlayer player, CombatState state, CombatInputPayload input, long now) {
 		boolean directional = input.forward() * input.forward() + input.strafe() * input.strafe() > 0.04f;
 		float yaw = directional
 				? Directions.worldYaw(input.aimYaw(), input.forward(), input.strafe())
@@ -45,9 +49,11 @@ public class EvadeMove implements Move {
 
 		state.invulnerableUntil = Math.max(state.invulnerableUntil, now + FreeflowConfig.evadeIframeTicks);
 		state.projectileDodgeUntil = now + FreeflowConfig.rollProjectileDodgeTicks; // arrows miss a rolling target
-		state.evadeCooldownUntil = now + FreeflowConfig.evadeCooldownTicks;
 		state.lastVaultTarget = vaultTarget;
 		int mode = vaultTarget != null ? EvadePayload.VAULT : directional ? EvadePayload.ROLL : EvadePayload.BACKFLIP;
+		// The next roll can start once this one's animation has played out.
+		state.evadeCooldownUntil = now + (mode == EvadePayload.VAULT ? FreeflowConfig.vaultRecoveryTicks
+				: FreeflowConfig.rollRecoveryTicks);
 		Anim.play(player, switch (mode) {
 			case EvadePayload.VAULT -> Anim.VAULT;
 			case EvadePayload.ROLL -> Anim.ROLL;
@@ -77,7 +83,6 @@ public class EvadeMove implements Move {
 			ServerPlayNetworking.send(player,
 					new EvadePayload(yaw, distance, ticks, vaultTarget != null ? vaultTarget.getId() : -1, mode));
 		}
-		return true;
 	}
 
 	/** Closest enemy roughly in the evade direction and close enough to vault over. */

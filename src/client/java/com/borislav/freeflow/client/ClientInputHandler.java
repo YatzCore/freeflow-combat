@@ -46,8 +46,6 @@ public final class ClientInputHandler {
 			}
 			if (StatusMarkers.knockedDownNear(client.player, FreeflowConfig.groundTakedownRange)) {
 				send(CombatAction.GROUND_TAKEDOWN);
-			} else {
-				ClientCombo.flash("NO ENEMY DOWN NEARBY", 0x9A9A9A);
 			}
 		}
 		while (Keybinds.specialTakedown.consumeClick()) {
@@ -56,8 +54,6 @@ public final class ClientInputHandler {
 			}
 			if (ClientCombo.combo >= FreeflowConfig.specialTakedownCost) {
 				send(CombatAction.SPECIAL_TAKEDOWN);
-			} else {
-				ClientCombo.flash("NEEDS x" + FreeflowConfig.specialTakedownCost + " COMBO", 0x9A9A9A);
 			}
 		}
 		checkDoubleTap(client, active);

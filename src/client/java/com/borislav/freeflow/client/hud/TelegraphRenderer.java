@@ -49,14 +49,9 @@ public final class TelegraphRenderer {
 		return ACTIVE.size();
 	}
 
-	/** Cyan = counter it. Red = armed, evade. Yellow = ranged shot, counter deflects. Orange = creeper fuse, counter kicks it away. */
+	/** Two colours, like the Arkham games: blue = counter it, red = can't be countered, evade it. */
 	static int color(int kind) {
-		return switch (kind) {
-			case TelegraphPayload.ARMED -> 0xFFFF3B30;
-			case TelegraphPayload.RANGED -> 0xFFFFD23F;
-			case TelegraphPayload.CREEPER -> 0xFFFF8A1F;
-			default -> 0xFF4FD8FF;
-		};
+		return kind == TelegraphPayload.ARMED || kind == TelegraphPayload.RANGED ? 0xFFFF3B30 : 0xFF4FD8FF;
 	}
 
 	/**
@@ -100,7 +95,7 @@ public final class TelegraphRenderer {
 			float s = pulse ? 2.2f : 1.9f;
 			pose.scale(s, s, 1f);
 			g.fill(-5, -6, 5, 6, 0x90000000);
-			String text = t.kind() == TelegraphPayload.ARMED ? "!!" : "!";
+			String text = "!";
 			g.drawString(font, text, -font.width(text) / 2, -4, color, true);
 			pose.popPose();
 		}
@@ -132,7 +127,7 @@ public final class TelegraphRenderer {
 			float duration = Math.max(1, t.endTick() - t.startTick());
 			float progress = Mth.clamp((ClientCombo.clientTick + pt - t.startTick()) / duration, 0f, 1f);
 			boolean imminent = t.endTick() - ClientCombo.clientTick <= 3;
-			// Cyan = counter it. Red = armed, can't counter: evade. Yellow = ranged shot: counter deflects it.
+			// Blue = counter it. Red = can't be countered: evade it.
 			int base = color(t.kind());
 			int color = imminent && (ClientCombo.clientTick % 2 == 0) ? 0xFFFFFFFF : base;
 
@@ -145,7 +140,7 @@ public final class TelegraphRenderer {
 			pose.translate(x - cam.x, y - cam.y, z - cam.z);
 			pose.mulPose(camera.rotation());
 			pose.scale(scale, -scale, scale);
-			String s = t.kind() == TelegraphPayload.ARMED ? "!!" : "!";
+			String s = "!";
 			font.drawInBatch(s, -font.width(s) / 2.0f, -font.lineHeight / 2.0f, color, false, pose.last().pose(),
 					buffers, Font.DisplayMode.SEE_THROUGH, 0x50000000, 0xF000F0);
 			pose.popPose();

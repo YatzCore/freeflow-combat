@@ -237,8 +237,10 @@ A["evade"] = anim(
 # Combat roll: the player is turned to face the roll direction, then tucks and rolls forward.
 A["roll"] = anim(
     0.4,
+    # The whole body spins around a point 0.7 blocks up, so it is lifted mid-roll
+    # (head would otherwise go through the floor when upside down).
     body={"rotation": [(0, Z), (0.04, [15, 0, 0]), (0.33, [360, 0, 0]), (0.4, [360, 0, 0])],
-          "position": [(0, Z), (0.05, [0, -6, 1]), (0.18, [0, -11, 2]), (0.33, [0, -6, 2]), (0.4, Z)]},
+          "position": [(0, Z), (0.08, [0, 3, 1]), (0.18, [0, 8, 2]), (0.28, [0, 4, 2]), (0.36, [0, 1, 1]), (0.4, Z)]},
     torso={"rotation": [(0, Z), (0.06, [35, 0, 0]), (0.3, [35, 0, 0]), (0.4, Z)]},
     head={"rotation": [(0, Z), (0.06, [40, 0, 0]), (0.3, [40, 0, 0]), (0.4, Z)]},
     right_leg={"rotation": [(0, Z), (0.06, [-115, 0, 0]), (0.3, [-115, 0, 0]), (0.4, Z)]},
@@ -263,27 +265,29 @@ A["vault"] = anim(
 # three hammer blows with the other.
 A["ground_takedown"] = anim(
     1.0,
-    body={"position": [(0, Z), (0.12, [0, -4, 3]), (0.88, [0, -4, 3]), (1.0, Z)],
-          "rotation": [(0, Z), (0.12, [22, 0, 0]), (0.88, [22, 0, 0]), (1.0, Z)]},
-    torso={"rotation": [(0, Z), (0.12, [30, 0, 0]), (0.88, [30, 0, 0]), (1.0, Z)]},
-    right_leg={"rotation": [(0, Z), (0.12, [-45, 0, 5]), (0.88, [-45, 0, 5]), (1.0, Z)]},
-    left_leg={"rotation": [(0, Z), (0.12, [55, 0, -5]), (0.88, [55, 0, -5]), (1.0, Z)]},
-    left_arm={"rotation": [(0, Z), (0.12, [-75, 0, -10]), (0.88, [-75, 0, -10]), (1.0, Z)]},
-    right_arm={"rotation": [(0, Z), (0.18, [-165, 0, 10]), (0.27, [-55, 0, 0]), (0.42, [-165, 0, 10]), (0.51, [-55, 0, 0]),
-                            (0.68, [-175, 0, 10]), (0.78, [-45, 0, 0]), (0.9, [-60, 0, 0]), (1.0, Z)]},
-    head={"rotation": [(0, Z), (0.12, [25, 0, 0]), (0.88, [25, 0, 0]), (1.0, Z)]},
+    # Low crouch over the downed enemy (like sneaking, but deeper), off hand braced,
+    # three hammer blows straight down.
+    body={"position": [(0, Z), (0.12, [0, -3, 2]), (0.88, [0, -3, 2]), (1.0, Z)]},
+    torso={"rotation": [(0, Z), (0.12, [32, 0, 0]), (0.88, [32, 0, 0]), (1.0, Z)]},
+    head={"rotation": [(0, Z), (0.12, [30, 0, 0]), (0.88, [30, 0, 0]), (1.0, Z)]},
+    right_leg={"rotation": [(0, Z), (0.12, [-18, 0, 4]), (0.88, [-18, 0, 4]), (1.0, Z)]},
+    left_leg={"rotation": [(0, Z), (0.12, [18, 0, -4]), (0.88, [18, 0, -4]), (1.0, Z)]},
+    left_arm={"rotation": [(0, Z), (0.12, [-55, 0, -12]), (0.88, [-55, 0, -12]), (1.0, Z)]},
+    right_arm={"rotation": [(0, Z), (0.18, [-160, 0, 8]), (0.26, [-40, 0, 0]), (0.42, [-160, 0, 8]), (0.5, [-40, 0, 0]),
+                            (0.68, [-170, 0, 8]), (0.77, [-35, 0, 0]), (0.9, [-50, 0, 0]), (1.0, Z)]},
 )
 
 # Leap into a spinning hook kick.
 A["special_takedown"] = anim(
     0.55,
-    body={"rotation": [(0, Z), (0.08, [-8, 0, 0]), (0.36, [0, -360, 0]), (0.55, [0, -360, 0])],
-          "position": [(0, Z), (0.1, [0, 6, 1]), (0.28, [0, 7, 3]), (0.45, [0, 2, 3]), (0.55, Z)]},
-    right_leg={"rotation": [(0, Z), (0.12, [-40, 0, 25]), (0.26, [-75, 0, 70]), (0.38, [-65, 0, 55]), (0.55, Z)]},
-    left_leg={"rotation": [(0, Z), (0.12, [-85, 0, 0]), (0.36, [-60, 0, 0]), (0.55, Z)]},
-    right_arm={"rotation": [(0, Z), (0.15, [-20, 0, 80]), (0.4, [-30, 0, 60]), (0.55, Z)]},
-    left_arm={"rotation": [(0, Z), (0.15, [-60, 0, -80]), (0.4, [-50, 0, -60]), (0.55, Z)]},
-    torso={"rotation": [(0, Z), (0.26, [-10, 0, -15]), (0.55, Z)]},
+    # Big leaping front kick: jump, chamber, extend, land.
+    body={"position": [(0, Z), (0.1, [0, 5, 1]), (0.26, [0, 7, 3]), (0.42, [0, 3, 3]), (0.55, Z)],
+          "rotation": [(0, Z), (0.26, [-10, 0, 0]), (0.55, Z)]},
+    right_leg={"rotation": [(0, Z), (0.1, [-100, 0, 0]), (0.24, [-95, 0, 0]), (0.36, [-90, 0, 0]), (0.55, Z)]},
+    left_leg={"rotation": [(0, Z), (0.1, [-80, 0, 0]), (0.24, [30, 0, 0]), (0.42, [20, 0, 0]), (0.55, Z)]},
+    right_arm={"rotation": [(0, Z), (0.1, [-120, 0, 30]), (0.24, [40, 0, 40]), (0.55, Z)]},
+    left_arm={"rotation": [(0, Z), (0.1, [-120, 0, -30]), (0.24, [-70, 0, -50]), (0.55, Z)]},
+    torso={"rotation": [(0, Z), (0.24, [-20, 0, 0]), (0.55, Z)]},
 )
 
 # Feet-first slide: low, leaning back, legs out front, one arm back for balance.

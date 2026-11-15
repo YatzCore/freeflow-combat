@@ -75,7 +75,6 @@ public final class ClientCombo {
 			}
 			case SPECIAL_TAKEDOWN -> flash("SPECIAL TAKEDOWN", 0xFF4A3D);
 			case BLOCKED -> {
-				flash("BLOCKED - STUN IT OR HIT FROM BEHIND", 0x9AB8FF);
 				staggerUntilTick = clientTick + payload.ticks();
 				strikeLandTick = -1;
 			}
@@ -84,7 +83,6 @@ public final class ClientCombo {
 				Impact.hit(1);
 			}
 			case HIT -> Impact.hit(payload.ticks());
-			case CANT_COUNTER -> flash("CAN'T COUNTER - EVADE!", 0xFF3B30);
 			default -> {}
 		}
 	}

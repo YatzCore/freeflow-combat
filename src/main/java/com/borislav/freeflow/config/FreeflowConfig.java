@@ -104,8 +104,9 @@ public final class FreeflowConfig {
 	public static int evadeTicks = 7;
 	/** Invulnerability after starting an evade or vault. */
 	public static int evadeIframeTicks = 8;
-	/** 0 = rolls chain back to back, like the Arkham games. */
-	public static int evadeCooldownTicks = 0;
+	/** Ticks before the next roll can start (= the roll animation length); presses during a roll are ignored. */
+	public static int rollRecoveryTicks = 8;
+	public static int vaultRecoveryTicks = 9;
 	/** Arrows and other projectiles miss for this long after starting a roll. */
 	public static int rollProjectileDodgeTicks = 14;
 	/** Evading toward an enemy this close (and within the cone) vaults over it instead. */

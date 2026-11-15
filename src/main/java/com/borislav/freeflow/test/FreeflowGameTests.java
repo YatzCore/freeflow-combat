@@ -437,14 +437,21 @@ public class FreeflowGameTests implements FabricGameTest {
 	}
 
 	@GameTest(template = EMPTY_STRUCTURE)
-	public void rollsChainWithoutCooldown(GameTestHelper h) {
+	public void rollPressedMidRollIsIgnored(GameTestHelper h) {
 		ServerPlayer p = player(h, CombatMode.FORCED_ON);
 		CombatState state = CombatStateManager.get(p);
 		evade(p, 0, 1.0f);
+		long firstEnds = state.evadeCooldownUntil;
 		int acked = state.acceptedInputs;
-		evade(p, 0, -1.0f);
-		h.assertTrue(state.acceptedInputs == acked + 1, "rolls chain back to back with no cooldown");
-		h.succeed();
+		evade(p, 0, -1.0f); // pressed while still rolling
+		h.assertTrue(state.acceptedInputs == acked, "a roll pressed mid-roll is ignored");
+		h.assertTrue(state.evadeCooldownUntil == firstEnds, "nothing is queued");
+		h.runAfterDelay((int) (firstEnds - h.getLevel().getGameTime()) + 1, () -> {
+			h.assertTrue(state.evadeCooldownUntil == firstEnds, "no roll starts by itself afterwards");
+			evade(p, 0, -1.0f);
+			h.assertTrue(state.evadeCooldownUntil > firstEnds, "a new press after the roll ends starts a new roll");
+			h.succeed();
+		});
 	}
 
 	@GameTest(template = EMPTY_STRUCTURE, timeoutTicks = 40)
