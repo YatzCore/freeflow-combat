@@ -405,7 +405,13 @@ def fix_torso(a):
     return a
 
 
+# Replaced by motion capture (tools/mocap.py -> freeflow_mocap.json).
+MOCAP = {"run", "roll", "jab_right", "jab_left", "hook_right", "hook_left", "haymaker", "front_kick", "roundhouse"}
+
 if __name__ == "__main__":
+    for name in list(A):
+        if name in MOCAP:
+            del A[name]
     for name in A:
         A[name] = fix_torso(A[name])
     out = sys.argv[1] if len(sys.argv) > 1 else OUT

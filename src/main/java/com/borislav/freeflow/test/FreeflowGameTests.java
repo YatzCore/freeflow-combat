@@ -854,20 +854,37 @@ public class FreeflowGameTests implements FabricGameTest {
 	/** Every animation the server can trigger must exist in the animation file and parse. */
 	@GameTest(template = EMPTY_STRUCTURE)
 	public void combatAnimationsParse(GameTestHelper h) {
-		String path = "/assets/freeflow/player_animations/freeflow_combat.json";
-		try (var in = FreeflowGameTests.class.getResourceAsStream(path)) {
-			h.assertTrue(in != null, "animation file missing: " + path);
-			var json = com.google.gson.JsonParser.parseReader(
+		// Hand-made animations (tools/gen_animations.py) + motion capture (tools/mocap.py).
+		java.util.Map<String, Integer> lengths = new java.util.HashMap<>();
+		for (String file : new String[] {"freeflow_combat.json", "freeflow_mocap.json"}) {
+			String path = "/assets/freeflow/player_animations/" + file;
+			try (var in = FreeflowGameTests.class.getResourceAsStream(path)) {
+				h.assertTrue(in != null, "animation file missing: " + path);
+				var json = com.google.gson.JsonParser.parseReader(
+						new java.io.InputStreamReader(in, java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
+				var animations = dev.kosmx.playerAnim.core.data.gson.GeckoLibSerializer.deserialize(json);
+				animations.forEach(a -> {
+					h.assertTrue(!lengths.containsKey(a.getName()), "animation defined twice: " + a.getName());
+					lengths.put(a.getName(), a.getLength());
+				});
+			} catch (java.io.IOException e) {
+				h.fail("could not read animations: " + e);
+			}
+		}
+		for (String name : com.borislav.freeflow.combat.Anim.ALL) {
+			h.assertTrue(lengths.containsKey(name), "animation not found or failed to parse: " + name);
+			h.assertTrue(lengths.get(name) > 0, "animation has no length: " + name);
+		}
+		// Enemy motion-capture clips.
+		try (var in = FreeflowGameTests.class.getResourceAsStream("/assets/freeflow/mob_animations.json")) {
+			h.assertTrue(in != null, "mob_animations.json missing");
+			var mob = com.google.gson.JsonParser.parseReader(
 					new java.io.InputStreamReader(in, java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
-			var animations = dev.kosmx.playerAnim.core.data.gson.GeckoLibSerializer.deserialize(json);
-			java.util.Map<String, Integer> lengths = new java.util.HashMap<>();
-			animations.forEach(a -> lengths.put(a.getName(), a.getLength()));
-			for (String name : com.borislav.freeflow.combat.Anim.ALL) {
-				h.assertTrue(lengths.containsKey(name), "animation not found or failed to parse: " + name);
-				h.assertTrue(lengths.get(name) > 0, "animation has no length: " + name);
+			for (String clip : new String[] {"fall_back", "get_up"}) {
+				h.assertTrue(mob.has(clip) && mob.getAsJsonArray(clip).size() > 5, "mob clip missing: " + clip);
 			}
 		} catch (java.io.IOException e) {
-			h.fail("could not read animations: " + e);
+			h.fail("could not read mob animations: " + e);
 		}
 		h.succeed();
 	}

@@ -114,11 +114,32 @@ public final class MobAnimator {
 			}
 			case LAUNCHED -> roll(pose, t, h);
 			case STUNNED -> sway(pose, t, fadeInOut(t, d, 4));
-			case KNOCKED_DOWN -> lie(pose, lyingAngle(t, d, true));
-			case KNOCKED_OUT -> lie(pose, lyingAngle(t, Float.MAX_VALUE, false));
+			case KNOCKED_DOWN -> {
+				MobClips.Frame f = downFrame(t, d, true);
+				if (f != null) {
+					MobClips.applyBody(pose, f, h / 1.8f);
+				} else {
+					lie(pose, lyingAngle(t, d, true));
+				}
+			}
+			case KNOCKED_OUT -> {
+				MobClips.Frame f = downFrame(t, Float.MAX_VALUE, false);
+				if (f != null) {
+					MobClips.applyBody(pose, f, h / 1.8f);
+				} else {
+					lie(pose, lyingAngle(t, Float.MAX_VALUE, false));
+				}
+			}
 			case COUNTERED -> {
 				switch (s.param()) {
-					case MobReaction.COUNTER_THROW -> thrown(pose, t, d, h);
+					case MobReaction.COUNTER_THROW -> {
+					MobClips.Frame f = t >= THROW_TICKS ? lyingFrame(t, d) : null;
+					if (f != null) {
+						MobClips.applyBody(pose, f, h / 1.8f);
+					} else {
+						thrown(pose, t, d, h);
+					}
+				}
 					case MobReaction.COUNTER_KICK -> {
 						if (t < ROLL_TICKS + 2) {
 							roll(pose, t, h);
@@ -206,6 +227,41 @@ public final class MobAnimator {
 		lie(pose, angle);
 	}
 
+	// ------------------------------------------------------------------ mocap (fall / lie / get up)
+
+	/** The motion-captured fall plays this much faster than recorded (snappier knockdowns). */
+	private static final float FALL_SPEED = 1.5f;
+
+	/** Knocked down: mocap fall onto the back, lie still, mocap get-up over the last part of {@code d}. */
+	@Nullable
+	private static MobClips.Frame downFrame(float t, float d, boolean getsUp) {
+		if (MobClips.length(MobClips.FALL_BACK) == 0) {
+			return null;
+		}
+		int up = MobClips.length(MobClips.GET_UP);
+		if (getsUp && up > 0 && t > d - up) {
+			return MobClips.sample(MobClips.GET_UP, t - (d - up));
+		}
+		return MobClips.sample(MobClips.FALL_BACK, t * FALL_SPEED);
+	}
+
+	/** Already on the ground (after a throw): hold the lying pose, then get up at the end. */
+	@Nullable
+	private static MobClips.Frame lyingFrame(float t, float d) {
+		if (MobClips.length(MobClips.FALL_BACK) == 0) {
+			return null;
+		}
+		int up = MobClips.length(MobClips.GET_UP);
+		if (up > 0 && t > d - up) {
+			return MobClips.sample(MobClips.GET_UP, t - (d - up));
+		}
+		return MobClips.sample(MobClips.FALL_BACK, Float.MAX_VALUE);
+	}
+
+	private static void clipLimbs(Parts p, MobClips.Frame f) {
+		MobClips.applyLimbs(p.head(), p.body(), p.rightArm(), p.leftArm(), p.rightLeg(), p.leftLeg(), f, 1f);
+	}
+
 	// ------------------------------------------------------------------ limbs
 
 	/** Called right after the model's setupAnim: overrides/adds to the limb angles. */
@@ -228,13 +284,30 @@ public final class MobAnimator {
 			case HIT_MEDIUM -> stagger(p, bell(t / d));
 			case LAUNCHED -> tuck(p, t < ROLL_TICKS ? bell(t / ROLL_TICKS) : 0);
 			case STUNNED -> dazed(p, t, fadeInOut(t, d, 4));
-			case KNOCKED_DOWN -> sprawl(p, lyingAngle(t, d, true) / 90f);
-			case KNOCKED_OUT -> sprawl(p, lyingAngle(t, Float.MAX_VALUE, false) / 90f);
+			case KNOCKED_DOWN -> {
+				MobClips.Frame f = downFrame(t, d, true);
+				if (f != null) {
+					clipLimbs(p, f);
+				} else {
+					sprawl(p, lyingAngle(t, d, true) / 90f);
+				}
+			}
+			case KNOCKED_OUT -> {
+				MobClips.Frame f = downFrame(t, Float.MAX_VALUE, false);
+				if (f != null) {
+					clipLimbs(p, f);
+				} else {
+					sprawl(p, lyingAngle(t, Float.MAX_VALUE, false) / 90f);
+				}
+			}
 			case COUNTERED -> {
 				switch (s.param()) {
 					case MobReaction.COUNTER_THROW -> {
+						MobClips.Frame f = t >= THROW_TICKS ? lyingFrame(t, d) : null;
 						if (t < THROW_TICKS) {
 							flail(p, bell(t / THROW_TICKS));
+						} else if (f != null) {
+							clipLimbs(p, f);
 						} else {
 							float lt = t - THROW_TICKS;
 							float up = t > d - GET_UP_TICKS ? clamp01((t - (d - GET_UP_TICKS)) / GET_UP_TICKS) : 0;

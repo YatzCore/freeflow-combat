@@ -101,11 +101,11 @@ public final class FreeflowConfig {
 
 	/** Dodge distance (blocks) and duration (ticks). */
 	public static double evadeDistance = 4.0;
-	public static int evadeTicks = 7;
+	public static int evadeTicks = 9;
 	/** Invulnerability after starting an evade or vault. */
 	public static int evadeIframeTicks = 8;
 	/** Ticks before the next roll can start (= the roll animation length); presses during a roll are ignored. */
-	public static int rollRecoveryTicks = 8;
+	public static int rollRecoveryTicks = 10;
 	public static int vaultRecoveryTicks = 9;
 	/** Arrows and other projectiles miss for this long after starting a roll. */
 	public static int rollProjectileDodgeTicks = 14;

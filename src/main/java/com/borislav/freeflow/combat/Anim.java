@@ -23,7 +23,7 @@ public final class Anim {
 	public static final String ELBOW = "elbow";
 	public static final String KNEE = "knee";
 	public static final String FRONT_KICK = "front_kick";
-	public static final String ROUNDHOUSE = "roundhouse";
+	public static final String SIDE_KICK = "side_kick";
 	public static final String SPIN_BACKFIST = "spin_backfist";
 	public static final String HAYMAKER = "haymaker";
 	// Lunging strikes
@@ -48,13 +48,13 @@ public final class Anim {
 	public static final String SPECIAL_TAKEDOWN = "special_takedown";
 
 	public static final List<String> ALL = List.of(JAB_RIGHT, JAB_LEFT, HOOK_RIGHT, HOOK_LEFT, ELBOW, KNEE, FRONT_KICK,
-			ROUNDHOUSE, SPIN_BACKFIST, HAYMAKER, FLYING_KICK, FLYING_KNEE, BEATDOWN_RIGHT, BEATDOWN_LEFT, FINISHER,
+			SIDE_KICK, SPIN_BACKFIST, HAYMAKER, FLYING_KICK, FLYING_KNEE, BEATDOWN_RIGHT, BEATDOWN_LEFT, FINISHER,
 			COUNTER, COUNTER_KICK, COUNTER_THROW, STUN, EVADE, ROLL, VAULT, SLIDE, RUN, GROUND_TAKEDOWN, SPECIAL_TAKEDOWN);
 
 	/** Combo strings: the flow gets flashier as the combo grows. */
 	private static final List<String> TIER_LOW = List.of(JAB_RIGHT, JAB_LEFT, HOOK_RIGHT, FRONT_KICK);
-	private static final List<String> TIER_MID = List.of(HOOK_LEFT, HOOK_RIGHT, ELBOW, KNEE, ROUNDHOUSE);
-	private static final List<String> TIER_HIGH = List.of(HOOK_RIGHT, SPIN_BACKFIST, KNEE, HAYMAKER, ELBOW, ROUNDHOUSE);
+	private static final List<String> TIER_MID = List.of(HOOK_LEFT, HOOK_RIGHT, ELBOW, KNEE, SIDE_KICK);
+	private static final List<String> TIER_HIGH = List.of(HOOK_RIGHT, SPIN_BACKFIST, KNEE, HAYMAKER, ELBOW, SIDE_KICK);
 
 	/** Lunges at least this many ticks long become flying attacks. */
 	public static final int FLYING_TRAVEL_TICKS = 3;
@@ -63,7 +63,7 @@ public final class Anim {
 	public static final int MEDIUM = 2;
 	public static final int HEAVY = 3;
 
-	private static final Set<String> HEAVY_MOVES = Set.of(ROUNDHOUSE, SPIN_BACKFIST, HAYMAKER, FLYING_KICK, FLYING_KNEE,
+	private static final Set<String> HEAVY_MOVES = Set.of(SIDE_KICK, SPIN_BACKFIST, HAYMAKER, FLYING_KICK, FLYING_KNEE,
 			FINISHER, SPECIAL_TAKEDOWN, GROUND_TAKEDOWN, COUNTER_KICK, COUNTER_THROW);
 	private static final Set<String> LIGHT_MOVES = Set.of(JAB_RIGHT, JAB_LEFT, BEATDOWN_RIGHT, BEATDOWN_LEFT);
 

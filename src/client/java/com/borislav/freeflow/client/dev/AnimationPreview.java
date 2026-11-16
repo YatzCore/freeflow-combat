@@ -55,9 +55,29 @@ public final class AnimationPreview {
 
 	/** Player animations to preview, with the frame times (ticks) to capture. */
 	private static final String[] PLAYER_ANIMS = {
-			"roll", "evade", "vault", "slide", "run", "ground_takedown", "jab_right", "hook_right", "front_kick", "roundhouse",
-			"haymaker", "flying_kick", "finisher", "counter", "counter_kick", "counter_throw", "special_takedown"};
+			"roll", "evade", "vault", "slide", "run", "ground_takedown", "jab_right", "hook_right", "front_kick",
+			"haymaker", "side_kick", "flying_kick", "finisher", "counter", "counter_kick", "counter_throw", "special_takedown"};
 	private static final int[] FRAMES = {1, 3, 5, 7, 10};
+
+	/** FREEFLOW_PREVIEW_ANIMS=a,b,c overrides the list; FREEFLOW_PREVIEW_FRAMES=1,4,8 the frame ticks;
+	 *  FREEFLOW_PREVIEW_ONLY_PLAYER=1 skips the enemy-reaction scenes. */
+	private static String[] anims() {
+		String env = System.getenv("FREEFLOW_PREVIEW_ANIMS");
+		return env != null && !env.isBlank() ? env.split(",") : PLAYER_ANIMS;
+	}
+
+	private static int[] frameTicks() {
+		String env = System.getenv("FREEFLOW_PREVIEW_FRAMES");
+		if (env == null || env.isBlank()) {
+			return FRAMES;
+		}
+		String[] parts = env.split(",");
+		int[] out = new int[parts.length];
+		for (int i = 0; i < parts.length; i++) {
+			out[i] = Integer.parseInt(parts[i].trim());
+		}
+		return out;
+	}
 
 	public static void tick(Minecraft mc) {
 		if (!ENABLED || mc.player == null || mc.level == null) {
@@ -97,23 +117,29 @@ public final class AnimationPreview {
 		command(mc, "fill -6 201 -6 6 206 6 minecraft:air");
 		command(mc, "tp @p " + PX + " " + PY + " " + PZ + " 0 0");
 		command(mc, "kill @e[type=minecraft:zombie]"); // leftovers from earlier runs (dev world only)
-		then(20, () -> lookAt(new Vec3(PX + 4.2, PY + 1.1, PZ + 0.6), new Vec3(PX, PY + 0.9, PZ)));
+		double camDist = System.getenv("FREEFLOW_PREVIEW_CLOSE") != null ? 2.6 : 4.2;
+		then(20, () -> lookAt(new Vec3(PX + camDist, PY + 1.1, PZ + 0.6), new Vec3(PX, PY + 0.9, PZ)));
 
 		// --- player animations, side view ---
-		for (String anim : PLAYER_ANIMS) {
+		for (String anim : anims()) {
 			then(1, () -> {
 				facePlayer(mc, 0f);
 				CombatAnimations.playLocal(anim);
 				beginSheet("player_" + anim);
 			});
 			int last = 0;
-			for (int f : FRAMES) {
+			for (int f : frameTicks()) {
 				int wait = f - last;
 				last = f;
 				then(Math.max(0, wait - 1), () -> { });
 				then(0, () -> capture(mc));
 			}
 			then(12, () -> endSheet(mc));
+		}
+
+		if ("1".equals(System.getenv("FREEFLOW_PREVIEW_ONLY_PLAYER"))) {
+			then(10, () -> mc.stop());
+			return;
 		}
 
 		// --- enemy reactions on a zombie standing in front of the player, side view ---
@@ -124,7 +150,7 @@ public final class AnimationPreview {
 		reaction(mc, MobReaction.WINDUP, 12, 0, new int[] {3, 8, 12});
 		reaction(mc, MobReaction.ATTACK, 6, 0, new int[] {1, 3, 5});
 		reaction(mc, MobReaction.LAUNCHED, 16, 0, new int[] {2, 5, 8, 11, 15});
-		reaction(mc, MobReaction.KNOCKED_DOWN, 30, 0, new int[] {2, 5, 9, 15, 24, 29});
+		reaction(mc, MobReaction.KNOCKED_DOWN, 50, 0, new int[] {2, 5, 9, 14, 30, 36, 42, 49});
 		reaction(mc, MobReaction.COUNTERED, 30, MobReaction.COUNTER_THROW, new int[] {2, 5, 8, 11, 15, 25});
 		reaction(mc, MobReaction.STUNNED, 30, 0, new int[] {5, 15, 25});
 		then(30, () -> command(mc, "kill @e[type=minecraft:zombie]"));
