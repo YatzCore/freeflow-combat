@@ -2,6 +2,7 @@ package com.borislav.freeflow.client;
 
 import com.borislav.freeflow.combat.Directions;
 import com.borislav.freeflow.config.FreeflowConfig;
+import com.borislav.freeflow.network.MoveToPayload;
 import com.borislav.freeflow.network.StrikeStartPayload;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
@@ -24,7 +25,7 @@ public final class LungeController {
 	public static String lastTargetName = "-";
 
 	public static boolean isLunging() {
-		return target != null && ticksLeft > 0;
+		return (target != null && ticksLeft > 0) || moveTicksLeft > 0;
 	}
 
 	public static void onStrikeStart(StrikeStartPayload payload) {
@@ -47,6 +48,9 @@ public final class LungeController {
 
 	public static void tick(Minecraft mc) {
 		LocalPlayer player = mc.player;
+		if (player != null) {
+			tickMoveTo(player);
+		}
 		if (target == null || player == null) {
 			return;
 		}
@@ -86,6 +90,42 @@ public final class LungeController {
 		player.setYBodyRot(yaw);
 	}
 
+	// --- Move to a point (ground takedown: kneel beside the downed enemy's chest) ---
+
+	private static double moveX;
+	private static double moveZ;
+	private static int moveTicksLeft;
+	private static float moveFaceYaw;
+
+	public static void onMoveTo(MoveToPayload payload) {
+		target = null;
+		ticksLeft = 0;
+		moveX = payload.x();
+		moveZ = payload.z();
+		moveTicksLeft = Math.max(1, payload.ticks());
+		moveFaceYaw = payload.faceYaw();
+	}
+
+	public static boolean isMoving() {
+		return moveTicksLeft > 0;
+	}
+
+	private static void tickMoveTo(LocalPlayer player) {
+		if (moveTicksLeft <= 0) {
+			return;
+		}
+		double dx = (moveX - player.getX()) / moveTicksLeft;
+		double dz = (moveZ - player.getZ()) / moveTicksLeft;
+		player.setDeltaMovement(dx, player.getDeltaMovement().y, dz);
+		player.setYRot(moveFaceYaw);
+		player.setYHeadRot(moveFaceYaw);
+		player.setYBodyRot(moveFaceYaw);
+		if (--moveTicksLeft == 0) {
+			// Arrived: stop dead on the spot.
+			player.setDeltaMovement(0, player.getDeltaMovement().y, 0);
+		}
+	}
+
 	/** Turn to face an entity by id (e.g. the enemy just stunned). */
 	public static void faceEntity(int entityId) {
 		Minecraft mc = Minecraft.getInstance();
@@ -115,6 +155,7 @@ public final class LungeController {
 	public static void reset() {
 		target = null;
 		ticksLeft = 0;
+		moveTicksLeft = 0;
 		lastTargetName = "-";
 	}
 }

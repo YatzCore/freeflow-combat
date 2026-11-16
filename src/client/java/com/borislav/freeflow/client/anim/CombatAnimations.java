@@ -76,6 +76,28 @@ public final class CombatAnimations {
 		}
 	}
 
+	/** Developer preview diagnostics: is the local player's combat layer animating? */
+	public static String debugState() {
+		Minecraft mc = Minecraft.getInstance();
+		if (mc.player == null) {
+			return "no player";
+		}
+		IAnimation data = PlayerAnimationAccess.getPlayerAssociatedData(mc.player).get(LAYER_ID);
+		if (data instanceof ModifierLayer<?> layer) {
+			IAnimation anim = layer.getAnimation();
+			return "combat layer: " + (anim == null ? "empty" : (anim.isActive() ? "active" : "finished"));
+		}
+		return "no layer";
+	}
+
+	/** Plays an animation on the local player (developer preview). */
+	public static void playLocal(String name) {
+		Minecraft mc = Minecraft.getInstance();
+		if (mc.player != null) {
+			onAnimation(new AnimationPayload(mc.player.getId(), name));
+		}
+	}
+
 	@SuppressWarnings("unchecked")
 	public static void onAnimation(AnimationPayload payload) {
 		Minecraft mc = Minecraft.getInstance();

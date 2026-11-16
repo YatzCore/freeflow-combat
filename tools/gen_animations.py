@@ -235,19 +235,40 @@ A["evade"] = anim(
 )
 
 # Combat roll: the player is turned to face the roll direction, then tucks and rolls forward.
-A["roll"] = anim(
-    0.4,
-    # The whole body spins around a point 0.7 blocks up, so it is lifted mid-roll
-    # (head would otherwise go through the floor when upside down).
-    body={"rotation": [(0, Z), (0.04, [15, 0, 0]), (0.33, [360, 0, 0]), (0.4, [360, 0, 0])],
-          "position": [(0, Z), (0.08, [0, 3, 1]), (0.18, [0, 8, 2]), (0.28, [0, 4, 2]), (0.36, [0, 1, 1]), (0.4, Z)]},
-    torso={"rotation": [(0, Z), (0.06, [35, 0, 0]), (0.3, [35, 0, 0]), (0.4, Z)]},
-    head={"rotation": [(0, Z), (0.06, [40, 0, 0]), (0.3, [40, 0, 0]), (0.4, Z)]},
-    right_leg={"rotation": [(0, Z), (0.06, [-115, 0, 0]), (0.3, [-115, 0, 0]), (0.4, Z)]},
-    left_leg={"rotation": [(0, Z), (0.06, [-115, 0, 0]), (0.3, [-115, 0, 0]), (0.4, Z)]},
-    right_arm={"rotation": [(0, Z), (0.06, [-150, 0, 15]), (0.3, [-150, 0, 15]), (0.4, Z)]},
-    left_arm={"rotation": [(0, Z), (0.06, [-150, 0, -15]), (0.3, [-150, 0, -15]), (0.4, Z)]},
-)
+def _roll():
+    """
+    Forward roll that stays on the ground. playerAnimator spins the whole body around a point
+    0.7 blocks up, but a tucked body is a ball centred ~1.35 blocks up (hips 0.75 .. head 2.0,
+    radius ~0.65). Spinning around the ball's centre while keeping it on the floor needs this
+    position offset per angle theta (derived from T(0.7) R T(-0.7) == T(0.65) R T(-1.35)):
+        y = -0.05 - 0.65*cos(theta) blocks,   forward z = -0.65*sin(theta) blocks
+    The tuck blends in over the first 0.05 s and out over the last 0.07 s.
+    """
+    import math
+    start, spin_end, end = 0.05, 0.31, 0.4
+    times = [0, 0.03, 0.05, 0.08, 0.11, 0.14, 0.17, 0.2, 0.23, 0.26, 0.29, 0.31, 0.35, 0.4]
+    rot, pos = [], []
+    for t in times:
+        theta = 0.0 if t <= start else min(1.0, (t - start) / (spin_end - start)) * 360.0
+        tuck = min(1.0, t / start) if t < spin_end else max(0.0, 1.0 - (t - spin_end) / (end - spin_end))
+        r = math.radians(theta)
+        y = (-0.05 - 0.65 * math.cos(r)) * 16 * tuck
+        z = (-0.65 * math.sin(r)) * 16 * tuck
+        rot.append((t, [theta, 0, 0]))
+        pos.append((t, [0, round(y, 2), round(z, 2)]))
+    tucked = lambda v: [(0, Z), (start, v), (spin_end, v), (end, Z)]
+    return anim(
+        end,
+        body={"rotation": rot, "position": pos},
+        head={"rotation": tucked([45, 0, 0])},
+        right_leg={"rotation": tucked([-125, 0, 5])},
+        left_leg={"rotation": tucked([-125, 0, -5])},
+        right_arm={"rotation": tucked([-80, 0, -25])},
+        left_arm={"rotation": tucked([-80, 0, 25])},
+    )
+
+
+A["roll"] = _roll()
 
 # Rolling into an enemy: a high front flip over it.
 A["vault"] = anim(
@@ -263,19 +284,45 @@ A["vault"] = anim(
 
 # Drop onto the downed enemy: lean over it, knee down (rear leg back), one hand pinning it,
 # three hammer blows with the other.
-A["ground_takedown"] = anim(
-    1.0,
-    # Low crouch over the downed enemy (like sneaking, but deeper), off hand braced,
-    # three hammer blows straight down.
-    body={"position": [(0, Z), (0.12, [0, -3, 2]), (0.88, [0, -3, 2]), (1.0, Z)]},
-    torso={"rotation": [(0, Z), (0.12, [32, 0, 0]), (0.88, [32, 0, 0]), (1.0, Z)]},
-    head={"rotation": [(0, Z), (0.12, [30, 0, 0]), (0.88, [30, 0, 0]), (1.0, Z)]},
-    right_leg={"rotation": [(0, Z), (0.12, [-18, 0, 4]), (0.88, [-18, 0, 4]), (1.0, Z)]},
-    left_leg={"rotation": [(0, Z), (0.12, [18, 0, -4]), (0.88, [18, 0, -4]), (1.0, Z)]},
-    left_arm={"rotation": [(0, Z), (0.12, [-55, 0, -12]), (0.88, [-55, 0, -12]), (1.0, Z)]},
-    right_arm={"rotation": [(0, Z), (0.18, [-160, 0, 8]), (0.26, [-40, 0, 0]), (0.42, [-160, 0, 8]), (0.5, [-40, 0, 0]),
-                            (0.68, [-170, 0, 8]), (0.77, [-35, 0, 0]), (0.9, [-50, 0, 0]), (1.0, Z)]},
-)
+def _crouch(depth):
+    """
+    Minecraft's own sneak pose, scaled by depth (1 = vanilla sneak): torso tilts forward and drops,
+    head and arms drop with it, legs shift back under the hips so nothing separates. Returns
+    per-bone (rotation, position) vectors. Part positions are bedrock-style pixels (y up).
+    """
+    return {
+        "torso": ([28 * depth, 0, 0], [0, -3.2 * depth, 0]),
+        "head": ([0, 0, 0], [0, -4.2 * depth, 0]),
+        "right_arm": ([0, 0, 0], [0, -3.2 * depth, 0]),
+        "left_arm": ([0, 0, 0], [0, -3.2 * depth, 0]),
+        "right_leg": ([0, 0, 0], [0, -0.2 * depth, 4 * depth]),
+        "left_leg": ([0, 0, 0], [0, -0.2 * depth, 4 * depth]),
+    }
+
+
+def _ground_takedown():
+    deep = _crouch(1.4)
+    times = [0, 0.12, 0.88, 1.0]
+    w = [0, 1, 1, 0]
+    bones = {}
+    for bone, (rot, pos) in deep.items():
+        bones[bone] = {
+            "rotation": [(t, [v * k for v in rot]) for t, k in zip(times, w)],
+            "position": [(t, [v * k for v in pos]) for t, k in zip(times, w)],
+        }
+    # Head looks down at the enemy; off hand braced on it; three hammer blows straight down.
+    bones["head"]["rotation"] = [(0, Z), (0.12, [35, 0, 0]), (0.88, [35, 0, 0]), (1.0, Z)]
+    bones["left_arm"]["rotation"] = [(0, Z), (0.12, [-50, 0, -10]), (0.88, [-50, 0, -10]), (1.0, Z)]
+    bones["right_arm"]["rotation"] = [(0, Z), (0.18, [-170, 0, 10]), (0.26, [-35, 0, 0]), (0.42, [-170, 0, 10]),
+                                      (0.5, [-35, 0, 0]), (0.68, [-175, 0, 10]), (0.77, [-30, 0, 0]),
+                                      (0.9, [-45, 0, 0]), (1.0, Z)]
+    bones["body"] = {"position": [(0, Z), (0.12, [0, -3, 0]), (0.88, [0, -3, 0]), (1.0, Z)]}
+    a = anim(1.0, **bones)
+    a["keep_torso"] = True
+    return a
+
+
+A["ground_takedown"] = _ground_takedown()
 
 # Leap into a spinning hook kick.
 A["special_takedown"] = anim(
@@ -316,7 +363,51 @@ A["run"] = anim(
     left_leg={"rotation": [(0, [45, 0, 0]), (0.25, [-55, 0, 0]), (0.5, [45, 0, 0])]},
 )
 
+MAX_TORSO_TWIST = 25.0
+
+
+def _sample(frames, t):
+    """Linear interpolation of a keyframe dict {"time": {"vector": v}} at time t (clamped)."""
+    pts = sorted((float(k), d["vector"]) for k, d in frames.items())
+    if t <= pts[0][0]:
+        return list(pts[0][1])
+    for (t0, v0), (t1, v1) in zip(pts, pts[1:]):
+        if t0 <= t <= t1:
+            k = 0 if t1 == t0 else (t - t0) / (t1 - t0)
+            return [a + (b - a) * k for a, b in zip(v0, v1)]
+    return list(pts[-1][1])
+
+
+def fix_torso(a):
+    """
+    In Minecraft's player model the torso is a separate box hinged at the neck: pitching it
+    forward/back swings it away from the hips and legs, which looks broken. Move all torso pitch
+    onto the whole body ("body" bone) instead, and limit torso twist.
+    """
+    if a.pop("keep_torso", False):
+        return a
+    bones = a["bones"]
+    torso = bones.get("torso", {}).get("rotation")
+    if not torso:
+        return a
+    body = bones.setdefault("body", {})
+    body_rot = body.get("rotation")
+    times = sorted({float(k) for k in torso} | ({float(k) for k in body_rot} if body_rot else set()))
+    new_body, new_torso = [], []
+    for t in times:
+        tv = _sample(torso, t)
+        bv = _sample(body_rot, t) if body_rot else [0, 0, 0]
+        new_body.append((t, [bv[0] + tv[0], bv[1], bv[2]]))
+        twist = max(-MAX_TORSO_TWIST, min(MAX_TORSO_TWIST, tv[1]))
+        new_torso.append((t, [0, twist, tv[2]]))
+    body["rotation"] = kf(new_body)
+    bones["torso"]["rotation"] = kf(new_torso)
+    return a
+
+
 if __name__ == "__main__":
+    for name in A:
+        A[name] = fix_torso(A[name])
     out = sys.argv[1] if len(sys.argv) > 1 else OUT
     with open(out, "w", encoding="utf-8") as f:
         json.dump({"format_version": "1.8.0", "animations": A}, f, indent=1)

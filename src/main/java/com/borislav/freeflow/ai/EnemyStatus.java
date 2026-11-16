@@ -38,6 +38,7 @@ public final class EnemyStatus {
 		}
 		cancelAttack(player, slot);
 		slot.knockedDownUntil = now + ticks;
+		slot.downYaw = mob.yBodyRot;
 		slot.stunnedUntil = 0;
 		slot.beatdownHits = 0;
 		slot.nextAllowed = Math.max(slot.nextAllowed, slot.knockedDownUntil + 10);

@@ -1,6 +1,7 @@
 package com.borislav.freeflow.mixin.client;
 
 import com.borislav.freeflow.client.camera.CinematicShots;
+import com.borislav.freeflow.client.dev.AnimationPreview;
 import com.borislav.freeflow.client.camera.FreeflowCamera;
 import com.borislav.freeflow.client.camera.Impact;
 import com.borislav.freeflow.config.FreeflowConfig;
@@ -34,6 +35,11 @@ public abstract class CameraMixin {
 	@Inject(method = "setup", at = @At("TAIL"))
 	private void freeflow$orbit(BlockGetter level, Entity entity, boolean detachedArg, boolean mirrored,
 			float partialTick, CallbackInfo ci) {
+		if (AnimationPreview.cameraPos != null && entity == Minecraft.getInstance().player) {
+			setRotation(AnimationPreview.cameraYaw, AnimationPreview.cameraPitch); // dev preview: fixed camera
+			setPosition(AnimationPreview.cameraPos);
+			return;
+		}
 		if (!FreeflowCamera.isActive() || entity != Minecraft.getInstance().player) {
 			return;
 		}

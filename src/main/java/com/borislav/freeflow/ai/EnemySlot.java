@@ -17,6 +17,8 @@ public class EnemySlot {
 	public long nextAllowed = 0;
 	/** Enemy is stunned (countered / stunned / beaten down) until this tick: it can't attack. */
 	public long stunnedUntil = 0;
+	/** Body yaw a knocked-down enemy lies at (kept fixed so it doesn't swivel on the ground). */
+	public float downYaw = Float.NaN;
 	/** Enemy is knocked down until this tick (ground takedown possible). */
 	public long knockedDownUntil = 0;
 	/** Consecutive beatdown hits on this enemy. */

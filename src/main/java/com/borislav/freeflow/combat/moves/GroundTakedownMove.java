@@ -16,6 +16,9 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Mob;
+import net.minecraft.world.phys.Vec3;
+import com.borislav.freeflow.network.MoveToPayload;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 
 /**
  * Ground takedown (V): finishes the nearest knocked-down enemy. Takes
@@ -54,11 +57,17 @@ public class GroundTakedownMove implements Move {
 		EnemySlot slot = state.enemies.get(target.getId());
 		slot.knockedDownUntil = Math.max(slot.knockedDownUntil, state.takedownEndTick + 5);
 
-		double dist = Directions.horizontalDistance(player, target);
-		int travel = dist > StrikeMove.stopDistance(target) + 0.3
-				? Mth.clamp(Mth.ceil((dist - StrikeMove.stopDistance(target)) / FreeflowConfig.lungeSpeed), 1,
-				FreeflowConfig.maxLungeTicks) : 0;
-		StrikeMove.send(player, target.getId(), travel);
+		// The enemy lies on its back with its head away from where it was facing, so its chest is
+		// ~0.9 blocks behind its feet. Kneel beside the chest (on the player's side) facing it.
+		slot.downYaw = target.yBodyRot;
+		Vec3 spot = approachSpot(player, target);
+		Vec3 chest = chest(target);
+		float faceYaw = (float) Math.toDegrees(Math.atan2(-(chest.x - spot.x), chest.z - spot.z));
+		double dist = Math.sqrt(player.distanceToSqr(spot.x, player.getY(), spot.z));
+		int travel = Mth.clamp(Mth.ceil(dist / FreeflowConfig.lungeSpeed), 1, FreeflowConfig.maxLungeTicks);
+		if (ServerPlayNetworking.canSend(player, MoveToPayload.TYPE)) {
+			ServerPlayNetworking.send(player, new MoveToPayload(spot.x, spot.z, travel, faceYaw));
+		}
 		EnemyStatus.event(player, CombatEventPayload.Type.TAKEDOWN_START, target, FreeflowConfig.groundTakedownTicks);
 		Anim.play(player, Anim.GROUND_TAKEDOWN);
 		return true;
@@ -84,6 +93,23 @@ public class GroundTakedownMove implements Move {
 				SoundEvents.PLAYER_ATTACK_KNOCKBACK, SoundSource.PLAYERS, 1.3f, 0.5f);
 		player.serverLevel().sendParticles(ParticleTypes.CRIT, target.getX(), target.getY(0.3), target.getZ(),
 				16, 0.4, 0.1, 0.4, 0.3);
+	}
+
+	/** Where a knocked-down enemy's chest is (it lies on its back, head behind its feet). */
+	public static Vec3 chest(Mob mob) {
+		float r = mob.yBodyRot * Mth.DEG_TO_RAD;
+		double back = mob.getBbHeight() * 0.45;
+		return new Vec3(mob.getX() + Mth.sin(r) * back, mob.getY(), mob.getZ() - Mth.cos(r) * back);
+	}
+
+	/** Spot beside the downed enemy's chest, on whichever side is closer to the player. */
+	public static Vec3 approachSpot(ServerPlayer player, Mob mob) {
+		Vec3 chest = chest(mob);
+		float r = mob.yBodyRot * Mth.DEG_TO_RAD;
+		Vec3 side = new Vec3(Mth.cos(r), 0, Mth.sin(r)).scale(FreeflowConfig.groundTakedownSideOffset);
+		Vec3 a = chest.add(side);
+		Vec3 b = chest.subtract(side);
+		return player.distanceToSqr(a) <= player.distanceToSqr(b) ? a : b;
 	}
 
 	/** Getting hit during a ground takedown interrupts it. */

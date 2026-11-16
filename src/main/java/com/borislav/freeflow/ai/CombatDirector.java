@@ -148,6 +148,12 @@ public final class CombatDirector {
 				it.remove();
 				continue;
 			}
+			if (slot.isKnockedDown(now) && !Float.isNaN(slot.downYaw)) {
+				// Lying on the ground: don't let the AI swivel the body around.
+				mob.setYRot(slot.downYaw);
+				mob.setYBodyRot(slot.downYaw);
+				mob.setYHeadRot(slot.downYaw);
+			}
 			if (slot.isTelegraphing() && now >= slot.attackAt) {
 				slot.attackAt = -1;
 				sendTelegraph(player, mob, 0, 0);

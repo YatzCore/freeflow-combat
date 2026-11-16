@@ -146,6 +146,8 @@ public final class FreeflowConfig {
 	/** How long a knocked-down enemy stays down (60 = 3s). */
 	public static int knockdownTicks = 60;
 	public static double groundTakedownRange = 6.0;
+	/** How far to the side of the downed enemy's chest the player kneels. */
+	public static double groundTakedownSideOffset = 0.75;
 	/** Ground takedown duration (the player is locked and vulnerable meanwhile). */
 	public static int groundTakedownTicks = 20;
 	/** Combo needed (and spent) for a special takedown. */

@@ -3,6 +3,7 @@ package com.borislav.freeflow.client;
 import com.borislav.freeflow.FreeflowMod;
 import com.borislav.freeflow.client.anim.CombatAnimations;
 import com.borislav.freeflow.client.anim.MobAnimator;
+import com.borislav.freeflow.client.dev.AnimationPreview;
 import com.borislav.freeflow.network.MobReactionPayload;
 import com.borislav.freeflow.client.camera.CinematicShots;
 import com.borislav.freeflow.network.AnimationPayload;
@@ -21,6 +22,7 @@ import com.borislav.freeflow.network.ComboPayload;
 import com.borislav.freeflow.network.CombatSyncPayload;
 import com.borislav.freeflow.network.CounterPayload;
 import com.borislav.freeflow.network.EvadePayload;
+import com.borislav.freeflow.network.MoveToPayload;
 import com.borislav.freeflow.network.StrikeStartPayload;
 import com.borislav.freeflow.network.TelegraphPayload;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
@@ -57,6 +59,7 @@ public class FreeflowClient implements ClientModInitializer {
 			TargetIndicator.tick(client);
 			MobAnimator.tick(client);
 			CombatAnimations.tickRun(client);
+			AnimationPreview.tick(client);
 		});
 		HudRenderCallback.EVENT.register(ComboHud::render);
 		HudRenderCallback.EVENT.register(FightSummaryHud::render);
@@ -80,6 +83,8 @@ public class FreeflowClient implements ClientModInitializer {
 			LungeController.onCounter(payload.mobIds());
 			ClientCombo.onCounter(payload.mobIds().size());
 		});
+		ClientPlayNetworking.registerGlobalReceiver(MoveToPayload.TYPE,
+				(payload, context) -> LungeController.onMoveTo(payload));
 		ClientPlayNetworking.registerGlobalReceiver(EvadePayload.TYPE,
 				(payload, context) -> EvadeController.onEvade(payload));
 		ClientPlayNetworking.registerGlobalReceiver(CombatEventPayload.TYPE, (payload, context) -> {
