@@ -9,9 +9,11 @@
 		"EntityTurnMixin",
 		"ItemInHandLayerMixin",
 		"KeyboardInputMixin",
+		"KeyMappingAccessor",
 		"LivingEntityRendererMixin",
 		"MinecraftMixin",
-		"ModelPartMixin"
+		"ModelPartMixin",
+		"MouseHandlerMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

@@ -11,6 +11,8 @@ import com.borislav.freeflow.combat.CombatModeTracker;
 import com.borislav.freeflow.combat.CombatState;
 import com.borislav.freeflow.combat.CombatStateManager;
 import com.borislav.freeflow.config.ConfigStore;
+import com.borislav.freeflow.input.PadLogic;
+import com.borislav.freeflow.input.PadLogic.Cmd;
 import com.borislav.freeflow.config.FreeflowConfig;
 import net.fabricmc.loader.api.FabricLoader;
 import java.nio.file.Files;
@@ -1156,6 +1158,90 @@ public class FreeflowGameTests implements FabricGameTest {
 		} finally {
 			FreeflowConfig.extraArmed = before;
 		}
+		h.succeed();
+	}
+
+	// ------------------------------------------------------------------ controller layout (milestone 14)
+
+	private static final PadLogic.Context FIGHT = new PadLogic.Context(true, false, true, false, false);
+	private static final PadLogic.Context FIGHT_SPECIAL = new PadLogic.Context(true, false, true, false, true);
+
+	private static int b(int... buttons) {
+		int out = 0;
+		for (int x : buttons) {
+			out |= PadLogic.bit(x);
+		}
+		return out;
+	}
+
+	/** Runs a sequence of button states (one per tick) and collects every command. */
+	private static List<Cmd> play(PadLogic pad, PadLogic.Context c, int... frames) {
+		List<Cmd> all = new java.util.ArrayList<>();
+		for (int f : frames) {
+			all.addAll(pad.tick(f, c).cmds);
+		}
+		return all;
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE)
+	public void padArkhamFaceButtons(GameTestHelper h) {
+		h.assertTrue(play(new PadLogic(), FIGHT, b(PadLogic.SQUARE), 0).equals(List.of(Cmd.STRIKE)), "square strikes");
+		h.assertTrue(play(new PadLogic(), FIGHT, b(PadLogic.TRIANGLE), 0).equals(List.of(Cmd.COUNTER)), "triangle counters");
+		h.assertTrue(play(new PadLogic(), FIGHT, b(PadLogic.CIRCLE), 0).equals(List.of(Cmd.STUN)),
+				"circle stuns at once when no special takedown is possible");
+		h.succeed();
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE)
+	public void padTakedownChords(GameTestHelper h) {
+		PadLogic.Context downNear = new PadLogic.Context(true, false, true, true, false);
+		h.assertTrue(play(new PadLogic(), downNear, b(PadLogic.R2), b(PadLogic.R2, PadLogic.TRIANGLE), 0)
+				.equals(List.of(Cmd.GROUND_TAKEDOWN)), "R2 + triangle is a ground takedown, not a counter");
+		h.assertTrue(play(new PadLogic(), FIGHT, b(PadLogic.R2), b(PadLogic.R2, PadLogic.TRIANGLE), 0)
+				.equals(List.of(Cmd.COUNTER)), "R2 + triangle with nobody down still counters");
+
+		h.assertTrue(play(new PadLogic(), FIGHT_SPECIAL, b(PadLogic.CIRCLE, PadLogic.TRIANGLE), 0, 0, 0, 0)
+				.equals(List.of(Cmd.SPECIAL_TAKEDOWN)), "circle + triangle together: special takedown only");
+		h.assertTrue(play(new PadLogic(), FIGHT_SPECIAL, b(PadLogic.CIRCLE), b(PadLogic.CIRCLE, PadLogic.TRIANGLE), 0, 0, 0)
+				.equals(List.of(Cmd.SPECIAL_TAKEDOWN)), "circle then triangle a tick later: special, no stun");
+		h.assertTrue(play(new PadLogic(), FIGHT_SPECIAL, b(PadLogic.TRIANGLE), b(PadLogic.TRIANGLE, PadLogic.CIRCLE), 0, 0)
+				.equals(List.of(Cmd.COUNTER, Cmd.SPECIAL_TAKEDOWN)), "triangle is never delayed; circle right after completes the chord");
+		h.assertTrue(play(new PadLogic(), FIGHT_SPECIAL, b(PadLogic.CIRCLE), 0, 0, 0)
+				.equals(List.of(Cmd.STUN)), "circle alone still stuns once the chord window passes");
+		h.succeed();
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE)
+	public void padCrossRunsAndEvades(GameTestHelper h) {
+		PadLogic pad = new PadLogic();
+		PadLogic.Output held = pad.tick(b(PadLogic.CROSS), FIGHT);
+		h.assertTrue(held.sprint && !held.jump && held.cmds.isEmpty(), "holding cross runs, never jumps, in a fight");
+		h.assertTrue(play(pad, FIGHT, b(PadLogic.CROSS), b(PadLogic.CROSS), 0, 0, 0, 0, 0, 0, 0, 0, 0, b(PadLogic.CROSS)).isEmpty(),
+				"a single tap (or two far apart) does not evade");
+		h.assertTrue(play(new PadLogic(), FIGHT, b(PadLogic.CROSS), 0, b(PadLogic.CROSS), 0).equals(List.of(Cmd.EVADE)),
+				"a quick double tap evades");
+
+		PadLogic.Context running = new PadLogic.Context(true, true, true, false, false);
+		PadLogic slide = new PadLogic();
+		PadLogic.Output tap = slide.tick(b(PadLogic.R2), running);
+		h.assertTrue(tap.cmds.equals(List.of(Cmd.SLIDE)) && !tap.sneak, "R2 while running slides instead of crouching");
+		PadLogic.Output crouch = new PadLogic().tick(b(PadLogic.R2), FIGHT);
+		h.assertTrue(crouch.cmds.isEmpty() && crouch.sneak, "R2 standing still crouches");
+		h.succeed();
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE)
+	public void padOutsideFightIsMinecraft(GameTestHelper h) {
+		PadLogic.Context calm = new PadLogic.Context(false, false, true, false, false);
+		PadLogic pad = new PadLogic();
+		PadLogic.Output o = pad.tick(b(PadLogic.CROSS, PadLogic.R2, PadLogic.L2), calm);
+		h.assertTrue(o.jump && o.attack && o.use && !o.sprint, "cross jumps, R2 attacks, L2 uses");
+		h.assertTrue(play(new PadLogic(), calm, b(PadLogic.TRIANGLE)).equals(List.of(Cmd.INVENTORY)), "triangle opens the inventory");
+
+		PadLogic menu = new PadLogic();
+		menu.reset(b(PadLogic.OPTIONS));
+		h.assertTrue(play(menu, calm, b(PadLogic.OPTIONS), 0).isEmpty(),
+				"the button that closed a menu doesn't act again when the game resumes");
 		h.succeed();
 	}
 }

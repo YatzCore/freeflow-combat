@@ -37,7 +37,8 @@ public @interface Setting {
 		DEFENCE("Counter & Evade"),
 		TAKEDOWNS("Stun & Takedowns"),
 		CAMERA("Camera"),
-		EFFECTS("Effects & HUD");
+		EFFECTS("Effects & HUD"),
+		CONTROLLER("Controller");
 
 		public final String title;
 

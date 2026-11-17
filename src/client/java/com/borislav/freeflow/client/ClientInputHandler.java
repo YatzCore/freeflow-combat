@@ -4,6 +4,7 @@ import com.borislav.freeflow.client.camera.FreeflowCamera;
 import com.borislav.freeflow.client.camera.RelativeMovement;
 import com.borislav.freeflow.client.hud.DebugOverlay;
 import com.borislav.freeflow.client.hud.StatusMarkers;
+import com.borislav.freeflow.client.pad.PadInput;
 import com.borislav.freeflow.combat.CombatAction;
 import com.borislav.freeflow.config.FreeflowConfig;
 import com.borislav.freeflow.network.CombatInputPayload;
@@ -69,7 +70,9 @@ public final class ClientInputHandler {
 
 	private static void checkSlide(Minecraft client, boolean active) {
 		boolean down = client.options.keySprint.isDown();
-		if (down && !sprintWasDown && active && client.player.isSprinting() && client.player.onGround()) {
+		// The pad holds sprint for ✕ (run); its slide is R2, handled in PadLogic.
+		if (down && !sprintWasDown && !PadInput.holdsSprint() && active && client.player.isSprinting()
+				&& client.player.onGround()) {
 			send(CombatAction.SLIDE);
 		}
 		sprintWasDown = down;
@@ -124,6 +127,15 @@ public final class ClientInputHandler {
 				send(action);
 			}
 		}
+	}
+
+	/** A combat action from the controller (PadInput). */
+	public static void padAction(CombatAction action) {
+		send(action);
+	}
+
+	public static void padAction(CombatAction action, float forward, float left) {
+		send(action, forward, left);
 	}
 
 	private static void send(CombatAction action) {

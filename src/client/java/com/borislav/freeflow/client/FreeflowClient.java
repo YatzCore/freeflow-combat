@@ -11,6 +11,7 @@ import com.borislav.freeflow.client.camera.CombatFraming;
 import com.borislav.freeflow.client.camera.FreeflowCamera;
 import com.borislav.freeflow.client.camera.Impact;
 import com.borislav.freeflow.client.hud.TargetIndicator;
+import com.borislav.freeflow.client.pad.PadInput;
 import com.borislav.freeflow.client.hud.ComboHud;
 import com.borislav.freeflow.client.hud.FightSummaryHud;
 import com.borislav.freeflow.network.FightSummaryPayload;
@@ -56,6 +57,7 @@ public class FreeflowClient implements ClientModInitializer {
 		ClientPlayNetworking.registerGlobalReceiver(AnimationPayload.TYPE,
 				(payload, context) -> CombatAnimations.onAnimation(payload));
 		ClientTickEvents.START_CLIENT_TICK.register(client -> {
+			PadInput.tick(client); // before vanilla reads its keys this tick
 			ClientCombo.tick();
 			LungeController.tick(client);
 			EvadeController.tick(client);

@@ -33,6 +33,7 @@ public final class DebugOverlay {
 				"Camera: " + (FreeflowCamera.isActive() ? "orbit" : (FreeflowCamera.userEnabled ? "idle" : "disabled [J]"))
 						+ "  shoulder: " + (FreeflowCamera.shoulderSide() > 0 ? "R" : "L") + " [H]"
 						+ String.format("  dist %.1f", FreeflowCamera.currentDistance()),
+				com.borislav.freeflow.client.pad.PadInput.debugLine(),
 		};
 
 		int x = 4;

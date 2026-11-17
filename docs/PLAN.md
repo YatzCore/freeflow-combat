@@ -43,9 +43,9 @@ Project lives in this repo; JDK 21 (Temurin) is required to build.
 16. **PS5 DualSense controller support** (client):
     - Read the pad through LWJGL/GLFW's gamepad API (`glfwGetGamepadState`, SDL mappings; DualSense works over USB and Bluetooth on Windows). No extra native library needed.
     - **Left stick** = camera-relative movement (feeds `RelativeMovement`, analog speed); **right stick** = orbit camera (deadzone + response curve + sensitivity).
-    - Combat layout (rebindable, Arkham-like): **□ Square** strike, **△ Triangle** counter, **○ Circle** stun, **✕ Cross** evade/vault (double-tap direction also works), **R2** ground takedown, **□+△** special takedown, **L1** swap shoulder, **R3** toggle camera, **Touchpad** cycle combat mode, **Options** opens the pause menu.
-    - Out of combat the pad still walks, looks, jumps (✕), attacks/mines (R2) and uses items (L2), with hotbar on L1/R1 outside combat. Inventory/menu cursor control is left to **Controlify** if the player installs it: detect it and only add our combat bindings on top of it, so they don't conflict.
-    - Button-prompt glyphs (□ △ ○ ✕) in the combat HUD when a pad is the last-used input.
+    - Combat layout copied from **Batman: Arkham Knight (PS4)** for the moves the mod has: **□** strike (mash on a stunned enemy = beatdown), **△** counter, **○** stun, **hold ✕** run, **double-tap ✕** evade (toward an enemy = vault), **R2** crouch / **tap R2 while running** slide, **R2+△** ground takedown, **○+△** special combo takedown. No Arkham equivalent, so on free buttons: **R3** swap shoulder, **D-pad →** toggle combat camera, **D-pad ↑** cycle combat mode, **Create** settings, **Options** pause.
+    - Out of combat the pad plays Minecraft: ✕ jump, L3 sprint, ○ sneak, R2/□ attack/mine, L2 use, △ inventory, D-pad ↓ drop, L1/R1 hotbar (L1/R1 also in combat). Menus: ○/△/Options close them; cursor control is left to **Controlify**, and our pad layer turns itself off when Controlify is installed.
+    - No on-screen button prompts (the player asked for no text hints).
     - Stretch: DualSense **rumble/haptics and adaptive triggers** on hits/counters via HID output reports (needs a HID library such as hid4java); optional and behind a config flag.
 17. **Multiplayer-safe** — server-authoritative; each player has their own director tokens.
 
@@ -114,7 +114,7 @@ src/main/resources/
 11. **Animations** — Blockbench → playerAnimator (placeholder vanilla swings until here).
 12. **Juice** — hit-stop, FOV, slow-mo finisher, sounds, particles, end-of-fight score.
 13. **Config + ModMenu screen.**
-14. **DualSense controller** — GLFW gamepad input layer, stick movement/camera, combat button layout, Controlify detection, HUD glyphs; optional rumble/adaptive triggers last.
+14. **DualSense controller** — GLFW gamepad input layer, stick movement/camera, Arkham Knight button layout, Controlify detection; optional rumble/adaptive triggers last.
 15. **Multiplayer test + balance pass**, then build release jar (GitHub release on the private repo).
 
 ## Risks

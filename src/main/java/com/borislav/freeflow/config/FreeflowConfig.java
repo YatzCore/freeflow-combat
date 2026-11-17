@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static com.borislav.freeflow.config.Setting.Category.CAMERA;
+import static com.borislav.freeflow.config.Setting.Category.CONTROLLER;
 import static com.borislav.freeflow.config.Setting.Category.DEFENCE;
 import static com.borislav.freeflow.config.Setting.Category.EFFECTS;
 import static com.borislav.freeflow.config.Setting.Category.ENEMIES;
@@ -343,4 +344,25 @@ public final class FreeflowConfig {
 	@Setting(category = EFFECTS, name = "Hide player when camera is closer than", min = 0, max = 3, client = true,
 			tip = "Blocks.")
 	public static double hidePlayerDistance = 0.9;
+
+	// --- Controller (client) ---
+
+	@Setting(category = CONTROLLER, name = "Controller support", client = true,
+			tip = "Play with a PS5 DualSense (or any gamepad) using the Arkham Knight layout. "
+					+ "Turned off automatically when Controlify is installed.")
+	public static boolean padEnabled = true;
+	@Setting(category = CONTROLLER, name = "Stick deadzone", min = 0, max = 0.6, client = true,
+			tip = "Stick movement smaller than this is ignored (stops drift).")
+	public static double padDeadzone = 0.12;
+	@Setting(category = CONTROLLER, name = "Camera speed", min = 30, max = 900, client = true,
+			tip = "Degrees per second with the right stick fully pushed.")
+	public static double padLookSpeed = 300.0;
+	@Setting(category = CONTROLLER, name = "Camera vertical speed", min = 0.1, max = 2, client = true,
+			tip = "Up/down speed as a fraction of the side-to-side speed.")
+	public static double padLookPitchScale = 0.6;
+	@Setting(category = CONTROLLER, name = "Invert camera up/down", client = true)
+	public static boolean padInvertY = false;
+	@Setting(category = CONTROLLER, name = "Trigger threshold", min = 0.05, max = 0.95, client = true,
+			tip = "How far L2/R2 must be pulled to count as pressed.")
+	public static double padTriggerThreshold = 0.4;
 }

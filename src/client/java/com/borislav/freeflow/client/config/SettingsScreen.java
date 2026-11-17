@@ -47,7 +47,8 @@ public final class SettingsScreen {
 		for (Setting.Category c : Setting.Category.values()) {
 			ConfigCategory tab = builder.getOrCreateCategory(Component.literal(c.title));
 			tabs.put(c, tab);
-			if (onRemoteServer && c != Setting.Category.CAMERA && c != Setting.Category.EFFECTS) {
+			if (onRemoteServer && c != Setting.Category.CAMERA && c != Setting.Category.EFFECTS
+					&& c != Setting.Category.CONTROLLER) {
 				tab.addEntry(eb.startTextDescription(Component.literal(
 						"You're on a server: its gameplay settings apply while you play there. "
 								+ "Changes here are saved for your own worlds.").withStyle(ChatFormatting.YELLOW)).build());
