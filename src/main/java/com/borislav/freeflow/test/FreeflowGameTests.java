@@ -10,6 +10,8 @@ import com.borislav.freeflow.combat.CombatMode;
 import com.borislav.freeflow.combat.CombatModeTracker;
 import com.borislav.freeflow.combat.CombatState;
 import com.borislav.freeflow.combat.CombatStateManager;
+import com.borislav.freeflow.combat.RunBoost;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import com.borislav.freeflow.config.ConfigStore;
 import com.borislav.freeflow.input.PadLogic;
 import com.borislav.freeflow.input.PadLogic.Cmd;
@@ -1242,6 +1244,22 @@ public class FreeflowGameTests implements FabricGameTest {
 		menu.reset(b(PadLogic.OPTIONS));
 		h.assertTrue(play(menu, calm, b(PadLogic.OPTIONS), 0).isEmpty(),
 				"the button that closed a menu doesn't act again when the game resumes");
+		h.succeed();
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE)
+	public void runningInAFightIsFaster(GameTestHelper h) {
+		ServerPlayer p = player(h, CombatMode.FORCED_ON);
+		var speed = p.getAttribute(Attributes.MOVEMENT_SPEED);
+		p.setSprinting(true);
+		RunBoost.update(p, true);
+		h.assertTrue(speed.getModifier(RunBoost.ID) != null, "sprinting in freeflow gets the run speed bonus");
+		RunBoost.update(p, false);
+		h.assertTrue(speed.getModifier(RunBoost.ID) == null, "no bonus outside freeflow");
+		RunBoost.update(p, true);
+		p.setSprinting(false);
+		RunBoost.update(p, true);
+		h.assertTrue(speed.getModifier(RunBoost.ID) == null, "the bonus ends when you stop running");
 		h.succeed();
 	}
 }

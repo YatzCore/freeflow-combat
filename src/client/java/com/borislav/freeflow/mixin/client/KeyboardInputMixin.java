@@ -1,5 +1,6 @@
 package com.borislav.freeflow.mixin.client;
 
+import com.borislav.freeflow.client.RunController;
 import com.borislav.freeflow.client.camera.RelativeMovement;
 import com.borislav.freeflow.client.pad.PadInput;
 import net.minecraft.client.player.KeyboardInput;
@@ -15,5 +16,6 @@ public abstract class KeyboardInputMixin {
 	private void freeflow$cameraRelative(boolean sneaking, float sneakSpeed, CallbackInfo ci) {
 		PadInput.applyMovement((KeyboardInput) (Object) this, sneaking, sneakSpeed); // left stick, before remapping
 		RelativeMovement.onInputTick((KeyboardInput) (Object) this);
+		RunController.onInputTick((KeyboardInput) (Object) this); // Space = run in fights
 	}
 }

@@ -11,6 +11,7 @@
 		"KeyboardInputMixin",
 		"KeyMappingAccessor",
 		"LivingEntityRendererMixin",
+		"LocalPlayerMixin",
 		"MinecraftMixin",
 		"ModelPartMixin",
 		"MouseHandlerMixin"

@@ -168,6 +168,15 @@ public final class FreeflowConfig {
 	@Setting(category = DEFENCE, name = "Vault duration", min = 3, max = 30, tip = "Ticks.")
 	public static int vaultTicks = 7;
 
+	// Running (in fights)
+	@Setting(category = DEFENCE, name = "Hold Space to run", client = true,
+			tip = "In a fight Space runs (hold) and evades (double-tap) instead of jumping; steps are climbed "
+					+ "automatically. Off: Space jumps as usual.")
+	public static boolean holdToRun = true;
+	@Setting(category = DEFENCE, name = "Run speed bonus", min = 0, max = 1.5,
+			tip = "Extra speed while running in a fight, on top of sprinting (0.25 = 25% faster).")
+	public static double runSpeedBonus = 0.25;
+
 	// Slide (tap sprint while running)
 	@Setting(category = DEFENCE, name = "Slide duration", min = 3, max = 40, tip = "Ticks.")
 	public static int slideTicks = 10;

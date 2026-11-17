@@ -102,7 +102,9 @@ public final class CombatStateManager {
 		}
 		state.wasInCombat = state.inCombat;
 
-		if (CombatModeTracker.isFreeflowActive(player, state)) {
+		boolean freeflow = CombatModeTracker.isFreeflowActive(player, state);
+		RunBoost.update(player, freeflow);
+		if (freeflow) {
 			for (Move move : MoveRegistry.all()) {
 				move.tick(player, state);
 			}
