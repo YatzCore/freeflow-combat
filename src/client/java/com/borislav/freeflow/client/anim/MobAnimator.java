@@ -177,6 +177,12 @@ public final class MobAnimator {
 		STATES.clear();
 	}
 
+	/** On the ground right now (knocked down or thrown, by anyone): a ground takedown can finish it. */
+	public static boolean isDown(int mobId) {
+		State s = STATES.get(mobId);
+		return s != null && isDownReaction(s) && ClientCombo.clientTick - s.start < s.duration;
+	}
+
 	@Nullable
 	private static State state(LivingEntity entity) {
 		return entity instanceof Mob ? STATES.get(entity.getId()) : null;

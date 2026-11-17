@@ -8,6 +8,7 @@ import com.borislav.freeflow.mixin.CreeperAccessor;
 import com.borislav.freeflow.network.TelegraphPayload;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Mob;
@@ -82,7 +83,7 @@ public final class CombatDirector {
 		CombatState state = CombatStateManager.get(player);
 		long now = player.level().getGameTime();
 		EnemySlot slot = slot(state, mob);
-		if (slot.isTelegraphing() || slot.isStunned(now) || now < slot.nextAllowed) {
+		if (slot.isTelegraphing() || slot.isStunned(now) || now < slot.nextAllowed || attackingSomeoneElse(player, mob)) {
 			return false;
 		}
 		int cap = ranged ? FreeflowConfig.maxSimultaneousShooters : FreeflowConfig.maxSimultaneousAttackers;
@@ -98,6 +99,21 @@ public final class CombatDirector {
 		sendTelegraph(player, mob, ticks, slot.kind);
 		MobReaction.send(mob, MobReaction.WINDUP, ticks, slot.kind, player);
 		return true;
+	}
+
+	/** Co-op: one enemy, one attack at a time, even when several players fight it. */
+	private static boolean attackingSomeoneElse(ServerPlayer player, Mob mob) {
+		for (Player other : player.level().players()) {
+			if (other == player || !(other instanceof ServerPlayer sp)) {
+				continue;
+			}
+			CombatState state = CombatStateManager.peek(sp);
+			EnemySlot slot = state == null ? null : state.enemies.get(mob.getId());
+			if (slot != null && slot.mob == mob && slot.isTelegraphing()) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/** True if the mob should hold back (no turn) instead of closing in. */
@@ -148,11 +164,11 @@ public final class CombatDirector {
 				it.remove();
 				continue;
 			}
-			if (slot.isKnockedDown(now) && !Float.isNaN(slot.downYaw)) {
+			if (slot.isKnockedDown(now) && !Float.isNaN(slot.status.downYaw)) {
 				// Lying on the ground: don't let the AI swivel the body around.
-				mob.setYRot(slot.downYaw);
-				mob.setYBodyRot(slot.downYaw);
-				mob.setYHeadRot(slot.downYaw);
+				mob.setYRot(slot.status.downYaw);
+				mob.setYBodyRot(slot.status.downYaw);
+				mob.setYHeadRot(slot.status.downYaw);
 			}
 			if (slot.isTelegraphing() && now >= slot.attackAt) {
 				slot.attackAt = -1;

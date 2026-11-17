@@ -101,7 +101,7 @@ public class StrikeMove implements Move {
 			return null;
 		}
 		EnemySlot slot = state.enemies.get(mob.getId());
-		return slot != null && slot.mob == mob && now < slot.stunnedUntil && !slot.isKnockedDown(now) ? mob : null;
+		return slot != null && slot.mob == mob && now < slot.status.stunnedUntil && !slot.isKnockedDown(now) ? mob : null;
 	}
 
 	private static void start(ServerPlayer player, CombatState state, CombatInputPayload input, long now) {
@@ -143,9 +143,9 @@ public class StrikeMove implements Move {
 
 		// Pick the move: special takedown, beatdown jabs, a flying attack for long lunges,
 		// or the next strike in the combo string (flashier as the combo grows).
-		EnemySlot targetSlot = state.enemies.get(target.getId());
-		boolean beatdown = !special && targetSlot != null && targetSlot.mob == target
-				&& now < targetSlot.stunnedUntil && !targetSlot.isKnockedDown(now);
+		// Stunned by anyone (co-op included): this strike is a beatdown.
+		com.borislav.freeflow.ai.MobStatus targetStatus = com.borislav.freeflow.ai.MobStatus.of(target);
+		boolean beatdown = !special && now < targetStatus.stunnedUntil && now >= targetStatus.knockedDownUntil;
 		String move = special ? Anim.SPECIAL_TAKEDOWN
 				: beatdown ? Anim.beatdown(state.strikeIndex)
 				: Anim.chooseStrike(state.strikeIndex, travel, state.combo);
@@ -189,7 +189,7 @@ public class StrikeMove implements Move {
 		}
 
 		EnemySlot slot = CombatDirector.slot(state, target);
-		boolean beatdown = now < slot.stunnedUntil && !slot.isKnockedDown(now);
+		boolean beatdown = now < slot.status.stunnedUntil && !slot.isKnockedDown(now);
 		if (EnemyStatus.shieldBlocks(player, target, beatdown)) {
 			// Bounced off the shield: recoil. Stun it first, or vault over and hit it from behind.
 			state.staggerUntil = now + FreeflowConfig.shieldRecoilTicks;
@@ -225,8 +225,8 @@ public class StrikeMove implements Move {
 		int recovery = ComboTracker.recoveryTicks(state);
 		if (beatdown) {
 			recovery = FreeflowConfig.beatdownRecoveryTicks;
-			slot.stunnedUntil = Math.max(slot.stunnedUntil, now + FreeflowConfig.beatdownStunExtendTicks);
-			if (++slot.beatdownHits >= FreeflowConfig.beatdownFinisherHits && target.isAlive()) {
+			slot.status.stunnedUntil = Math.max(slot.status.stunnedUntil, now + FreeflowConfig.beatdownStunExtendTicks);
+			if (++slot.status.beatdownHits >= FreeflowConfig.beatdownFinisherHits && target.isAlive()) {
 				target.knockback(FreeflowConfig.finisherKnockback, player.getX() - target.getX(), player.getZ() - target.getZ());
 				EnemyStatus.knockDown(player, state, target, FreeflowConfig.knockdownTicks);
 				Anim.play(player, Anim.FINISHER);
@@ -235,7 +235,7 @@ public class StrikeMove implements Move {
 				recovery = ComboTracker.recoveryTicks(state) + 2;
 			}
 		} else {
-			slot.beatdownHits = 0;
+			slot.status.beatdownHits = 0;
 			ImpactFx.knockback(player, target, strength);
 		}
 

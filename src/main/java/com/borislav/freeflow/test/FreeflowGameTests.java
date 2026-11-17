@@ -5,6 +5,7 @@ import com.borislav.freeflow.ai.EnemyRole;
 import com.borislav.freeflow.ai.EnemySlot;
 import com.borislav.freeflow.network.TelegraphPayload;
 import com.borislav.freeflow.ai.EnemyStatus;
+import com.borislav.freeflow.ai.MobStatus;
 import com.borislav.freeflow.combat.CombatAction;
 import com.borislav.freeflow.combat.CombatMode;
 import com.borislav.freeflow.combat.CombatModeTracker;
@@ -606,7 +607,7 @@ public class FreeflowGameTests implements FabricGameTest {
 					"the chain should end with the zombie taken down (knockedDown=%s, hp=%.1f, dist=%.2f, "
 							+ "stunned=%s, beatdownHits=%s, takedown=%s, lastAction=%s, acked=%d, inCombat=%s)",
 					knockedDown[0], z.getHealth(), z.distanceTo(p),
-					slot != null && now < slot.stunnedUntil, slot != null ? slot.beatdownHits : -1,
+					slot != null && now < slot.status.stunnedUntil, slot != null ? slot.status.beatdownHits : -1,
 					state.takedownTarget != null, state.lastAction, state.acceptedInputs, state.inCombat));
 		});
 	}
@@ -821,7 +822,7 @@ public class FreeflowGameTests implements FabricGameTest {
 
 		EnemyStatus.stun(p, state, golem, 40);
 		EnemySlot slot = state.enemies.get(golem.getId());
-		h.assertTrue(slot.stunnedUntil - now <= 10, "bosses are only stunned briefly");
+		h.assertTrue(slot.status.stunnedUntil - now <= 10, "bosses are only stunned briefly");
 		EnemyStatus.knockDown(p, state, golem, 60);
 		h.assertTrue(!slot.isKnockedDown(now), "bosses can't be knocked down");
 		h.succeed();
@@ -1260,6 +1261,50 @@ public class FreeflowGameTests implements FabricGameTest {
 		p.setSprinting(false);
 		RunBoost.update(p, true);
 		h.assertTrue(speed.getModifier(RunBoost.ID) == null, "the bonus ends when you stop running");
+		h.succeed();
+	}
+
+	// ------------------------------------------------------------------ co-op (milestone 15)
+
+	private static ServerPlayer secondPlayer(GameTestHelper h) {
+		ServerPlayer p = player(h, CombatMode.FORCED_ON);
+		Vec3 pos = h.absoluteVec(new Vec3(5.5, 1, 2.5));
+		p.moveTo(pos.x, pos.y, pos.z, FACING_PLUS_Z, 0.0f);
+		return p;
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE)
+	public void coopStunnedEnemyCantAttackTheOtherPlayer(GameTestHelper h) {
+		ServerPlayer a = player(h, CombatMode.FORCED_ON);
+		ServerPlayer b = secondPlayer(h);
+		Zombie z = zombie(h, 4.0, 4.0);
+		EnemyStatus.stun(a, CombatStateManager.get(a), z, 40);
+		h.assertTrue(!CombatDirector.requestAttack(b, z), "a zombie stunned by one player can't attack the other");
+		h.succeed();
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE)
+	public void coopOneEnemyAttacksOnePlayerAtATime(GameTestHelper h) {
+		ServerPlayer a = player(h, CombatMode.FORCED_ON);
+		ServerPlayer b = secondPlayer(h);
+		Zombie z = zombie(h, 4.0, 4.0);
+		Zombie other = zombie(h, 6.5, 4.5);
+		h.assertTrue(CombatDirector.requestAttack(a, z), "first player gets the attack");
+		h.assertTrue(!CombatDirector.requestAttack(b, z), "the same zombie can't also attack the second player");
+		h.assertTrue(CombatDirector.requestAttack(b, other), "each player has their own attack turns");
+		h.succeed();
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE)
+	public void coopFinishAnEnemyTheOtherPlayerPutDown(GameTestHelper h) {
+		ServerPlayer a = player(h, CombatMode.FORCED_ON);
+		ServerPlayer b = secondPlayer(h);
+		Zombie z = zombie(h, 4.0, 4.0);
+		EnemyStatus.knockDown(a, CombatStateManager.get(a), z, 60);
+		h.assertTrue(h.getLevel().getGameTime() < MobStatus.of(z).knockedDownUntil, "the zombie is down for everyone");
+		CombatStateManager.handleInput(b, new CombatInputPayload(CombatAction.GROUND_TAKEDOWN, 0, 0, FACING_PLUS_Z));
+		h.assertTrue(CombatStateManager.get(b).takedownTarget == z,
+				"the second player can ground-takedown an enemy the first one knocked down");
 		h.succeed();
 	}
 }

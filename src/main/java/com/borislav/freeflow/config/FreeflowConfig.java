@@ -30,6 +30,12 @@ public final class FreeflowConfig {
 			tip = "Ticks (20 = 1s) with no enemy engaged before combat mode ends.")
 	public static int combatCalmTicks = 80;
 
+	@Setting(category = GENERAL, name = "Fight rating XP", tip = "Award bonus XP for the fight rating when a fight ends.")
+	public static boolean fightXp = true;
+	@Setting(category = GENERAL, name = "Max XP per fight", min = 0, max = 1000,
+			tip = "Caps the fight-rating bonus (stops long fights against big mobs from farming XP on servers).")
+	public static int fightXpCap = 30;
+
 	/** How often (ticks) the server rescans for engaged mobs. */
 	public static int combatScanInterval = 4;
 

@@ -1,5 +1,7 @@
 package com.borislav.freeflow.combat.moves;
 
+import com.borislav.freeflow.ai.CombatDirector;
+import com.borislav.freeflow.ai.MobStatus;
 import com.borislav.freeflow.ai.EnemySlot;
 import com.borislav.freeflow.ai.EnemyStatus;
 import com.borislav.freeflow.combat.Anim;
@@ -35,10 +37,12 @@ public class GroundTakedownMove implements Move {
 		}
 		Mob target = null;
 		double best = FreeflowConfig.groundTakedownRange;
-		for (EnemySlot slot : state.enemies.values()) {
-			double dist = slot.mob.distanceTo(player);
-			if (slot.mob.isAlive() && slot.isKnockedDown(now) && dist <= best) {
-				target = slot.mob;
+		// Any enemy on the ground nearby, including ones another player put there (co-op).
+		for (Mob mob : player.level().getEntitiesOfClass(Mob.class, player.getBoundingBox().inflate(best),
+				Mob::isAlive)) {
+			double dist = mob.distanceTo(player);
+			if (dist <= best && now < MobStatus.of(mob).knockedDownUntil) {
+				target = mob;
 				best = dist;
 			}
 		}
@@ -54,12 +58,12 @@ public class GroundTakedownMove implements Move {
 		state.lockedUntil = state.takedownEndTick;
 
 		// Keep the enemy down until the takedown finishes.
-		EnemySlot slot = state.enemies.get(target.getId());
-		slot.knockedDownUntil = Math.max(slot.knockedDownUntil, state.takedownEndTick + 5);
+		EnemySlot slot = CombatDirector.slot(state, target);
+		slot.status.knockedDownUntil = Math.max(slot.status.knockedDownUntil, state.takedownEndTick + 5);
 
 		// The enemy lies on its back with its head away from where it was facing, so its chest is
 		// ~0.9 blocks behind its feet. Kneel beside the chest (on the player's side) facing it.
-		slot.downYaw = target.yBodyRot;
+		slot.status.downYaw = target.yBodyRot;
 		Vec3 spot = approachSpot(player, target);
 		Vec3 chest = chest(target);
 		float faceYaw = (float) Math.toDegrees(Math.atan2(-(chest.x - spot.x), chest.z - spot.z));

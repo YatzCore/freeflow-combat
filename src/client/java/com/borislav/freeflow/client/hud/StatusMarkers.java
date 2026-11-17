@@ -55,6 +55,13 @@ public final class StatusMarkers {
 		if (mc.level == null) {
 			return false;
 		}
+		// Knocked down by another player (co-op): seen through the enemy's reaction, which everyone gets.
+		for (net.minecraft.world.entity.Mob mob : mc.level.getEntitiesOfClass(net.minecraft.world.entity.Mob.class,
+				player.getBoundingBox().inflate(range), m -> m.isAlive() && m.distanceTo(player) <= range)) {
+			if (com.borislav.freeflow.client.anim.MobAnimator.isDown(mob.getId())) {
+				return true;
+			}
+		}
 		for (Map.Entry<Integer, Marker> e : MARKERS.entrySet()) {
 			if (e.getValue().status() == Status.KNOCKED_DOWN && ClientCombo.clientTick < e.getValue().endTick()) {
 				Entity entity = mc.level.getEntity(e.getKey());

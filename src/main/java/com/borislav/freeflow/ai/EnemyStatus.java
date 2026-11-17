@@ -21,11 +21,11 @@ public final class EnemyStatus {
 		}
 		EnemySlot slot = CombatDirector.slot(state, mob);
 		cancelAttack(player, slot);
-		slot.stunnedUntil = Math.max(slot.stunnedUntil, now + ticks);
-		slot.nextAllowed = Math.max(slot.nextAllowed, slot.stunnedUntil + 5);
+		slot.status.stunnedUntil = Math.max(slot.status.stunnedUntil, now + ticks);
+		slot.nextAllowed = Math.max(slot.nextAllowed, slot.status.stunnedUntil + 5);
 		immobilize(mob, ticks, 6);
-		event(player, CombatEventPayload.Type.STUN, mob, (int) (slot.stunnedUntil - now));
-		MobReaction.send(mob, MobReaction.STUNNED, (int) (slot.stunnedUntil - now), player);
+		event(player, CombatEventPayload.Type.STUN, mob, (int) (slot.status.stunnedUntil - now));
+		MobReaction.send(mob, MobReaction.STUNNED, (int) (slot.status.stunnedUntil - now), player);
 	}
 
 	/** Puts the enemy on the ground: a ground takedown can finish it. */
@@ -33,15 +33,15 @@ public final class EnemyStatus {
 		long now = player.level().getGameTime();
 		EnemySlot slot = CombatDirector.slot(state, mob);
 		if (isBoss(mob)) {
-			slot.beatdownHits = 0; // bosses can't be knocked down
+			slot.status.beatdownHits = 0; // bosses can't be knocked down
 			return;
 		}
 		cancelAttack(player, slot);
-		slot.knockedDownUntil = now + ticks;
-		slot.downYaw = mob.yBodyRot;
-		slot.stunnedUntil = 0;
-		slot.beatdownHits = 0;
-		slot.nextAllowed = Math.max(slot.nextAllowed, slot.knockedDownUntil + 10);
+		slot.status.knockedDownUntil = now + ticks;
+		slot.status.downYaw = mob.yBodyRot;
+		slot.status.stunnedUntil = 0;
+		slot.status.beatdownHits = 0;
+		slot.nextAllowed = Math.max(slot.nextAllowed, slot.status.knockedDownUntil + 10);
 		immobilize(mob, ticks, 10);
 		event(player, CombatEventPayload.Type.KNOCKDOWN, mob, ticks);
 		MobReaction.send(mob, MobReaction.KNOCKED_DOWN, ticks, player);

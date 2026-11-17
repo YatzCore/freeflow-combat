@@ -2,7 +2,7 @@ package com.borislav.freeflow.ai;
 
 import net.minecraft.world.entity.Mob;
 
-/** Director bookkeeping for one enemy fighting one player. */
+/** Director bookkeeping for one enemy fighting one player (its turns); what was done to it is {@link MobStatus}. */
 public class EnemySlot {
 	public final Mob mob;
 	/** Game tick the telegraphed attack lands, or -1 if not attacking. */
@@ -15,19 +15,14 @@ public class EnemySlot {
 	public int kind = 0;
 	/** Earliest tick this enemy may start another attack. */
 	public long nextAllowed = 0;
-	/** Enemy is stunned (countered / stunned / beaten down) until this tick: it can't attack. */
-	public long stunnedUntil = 0;
-	/** Body yaw a knocked-down enemy lies at (kept fixed so it doesn't swivel on the ground). */
-	public float downYaw = Float.NaN;
-	/** Enemy is knocked down until this tick (ground takedown possible). */
-	public long knockedDownUntil = 0;
-	/** Consecutive beatdown hits on this enemy. */
-	public int beatdownHits = 0;
+	/** Stun / knockdown / beatdown state, shared with every other player fighting this enemy. */
+	public final MobStatus status;
 	/** Last time a circling move was issued (throttle). */
 	public long lastReposition = -100;
 
 	public EnemySlot(Mob mob) {
 		this.mob = mob;
+		this.status = MobStatus.of(mob);
 	}
 
 	public boolean isTelegraphing() {
@@ -36,10 +31,10 @@ public class EnemySlot {
 
 	/** Can't attack (stunned or knocked down). */
 	public boolean isStunned(long now) {
-		return now < stunnedUntil || now < knockedDownUntil;
+		return now < status.stunnedUntil || now < status.knockedDownUntil;
 	}
 
 	public boolean isKnockedDown(long now) {
-		return now < knockedDownUntil;
+		return now < status.knockedDownUntil;
 	}
 }

@@ -52,6 +52,8 @@ public class FreeflowClient implements ClientModInitializer {
 		ClientPlayNetworking.registerGlobalReceiver(ConfigSyncPayload.TYPE, (payload, context) -> {
 			if (!Minecraft.getInstance().hasSingleplayerServer()) {
 				ConfigStore.applyRemote(payload.json());
+				FreeflowMod.LOGGER.info("Using the server's gameplay settings (strike range {})",
+						com.borislav.freeflow.config.FreeflowConfig.strikeRange);
 			}
 		});
 		ClientPlayNetworking.registerGlobalReceiver(AnimationPayload.TYPE,

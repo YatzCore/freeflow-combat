@@ -1,5 +1,6 @@
 package com.borislav.freeflow.combat;
 
+import com.borislav.freeflow.config.FreeflowConfig;
 import com.borislav.freeflow.ai.CombatDirector;
 import com.borislav.freeflow.combat.moves.GroundTakedownMove;
 import com.borislav.freeflow.combat.moves.Move;
@@ -131,7 +132,7 @@ public final class CombatStateManager {
 			return; // died, or nothing happened
 		}
 		int score = fight.score(state.maxCombo);
-		int xp = FightStats.xpFor(score);
+		int xp = FreeflowConfig.fightXp ? Math.min(FreeflowConfig.fightXpCap, FightStats.xpFor(score)) : 0;
 		if (xp > 0) {
 			player.giveExperiencePoints(xp);
 		}

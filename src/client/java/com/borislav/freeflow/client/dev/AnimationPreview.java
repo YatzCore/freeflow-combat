@@ -1,5 +1,6 @@
 package com.borislav.freeflow.client.dev;
 
+import com.borislav.freeflow.client.ClientCombatState;
 import com.borislav.freeflow.FreeflowMod;
 import com.borislav.freeflow.ai.MobReaction;
 import com.borislav.freeflow.client.anim.CombatAnimations;
@@ -128,6 +129,10 @@ public final class AnimationPreview {
 				then(1, () -> endSheet(mc));
 			}
 			then(5, () -> mc.stop());
+			return;
+		}
+		if ("1".equals(System.getenv("FREEFLOW_PREVIEW_MP"))) {
+			multiplayerFight(mc);
 			return;
 		}
 		FreeflowMod.LOGGER.info("[preview] starting animation preview");
@@ -370,6 +375,52 @@ public final class AnimationPreview {
 		cameraPos = from;
 		cameraYaw = (float) Math.toDegrees(Math.atan2(-d.x, d.z));
 		cameraPitch = (float) -Math.toDegrees(Math.atan2(d.y, Math.sqrt(d.x * d.x + d.z * d.z)));
+	}
+
+	/**
+	 * Multiplayer smoke test (on a dedicated server where this player is an operator): summons
+	 * zombies, fights them through the real network path for ~10 s, logs what the server sent back.
+	 */
+	private static void multiplayerFight(Minecraft mc) {
+		FreeflowMod.LOGGER.info("[preview] multiplayer fight");
+		String helmet = "{ArmorItems:[{},{},{},{id:\"minecraft:leather_helmet\",count:1}]}";
+		then(5, () -> remote(mc, "gamemode survival"));
+		then(5, () -> remote(mc, "effect give @s minecraft:resistance 60 3 true"));
+		then(5, () -> remote(mc, "kill @e[type=minecraft:zombie]"));
+		for (int i = 0; i < 3; i++) {
+			String at = new String[] {"~3 ~ ~", "~-3 ~ ~1", "~ ~ ~3"}[i];
+			then(2, () -> remote(mc, "summon minecraft:zombie " + at + " " + helmet));
+		}
+		int[] maxCombo = {0};
+		boolean[] fought = {false};
+		for (int t = 0; t < 240; t += 4) {
+			int tick = t;
+			then(4, () -> {
+				if (ClientCombatState.isFreeflowActive()) {
+					fought[0] = true;
+					com.borislav.freeflow.client.ClientInputHandler.padAction(
+							tick % 16 == 0 ? com.borislav.freeflow.combat.CombatAction.COUNTER
+									: com.borislav.freeflow.combat.CombatAction.STRIKE);
+				}
+				maxCombo[0] = Math.max(maxCombo[0], com.borislav.freeflow.client.ClientCombo.combo);
+				if (tick % 40 == 0) {
+					FreeflowMod.LOGGER.info("[preview] mp t={} freeflow={} sent={} acked={} combo={} health={}", tick,
+							ClientCombatState.isFreeflowActive(), ClientCombatState.sentInputs,
+							ClientCombatState.acceptedInputs, com.borislav.freeflow.client.ClientCombo.combo,
+							mc.player.getHealth());
+				}
+			});
+		}
+		then(5, () -> FreeflowMod.LOGGER.info("[preview] mp result: fought={} maxCombo={} sent={} acked={}",
+				fought[0], maxCombo[0], ClientCombatState.sentInputs, ClientCombatState.acceptedInputs));
+		then(5, () -> remote(mc, "kill @e[type=minecraft:zombie]"));
+		then(10, () -> mc.stop());
+	}
+
+	private static void remote(Minecraft mc, String cmd) {
+		if (mc.player != null) {
+			mc.player.connection.sendCommand(cmd);
+		}
 	}
 
 	private static void command(Minecraft mc, String cmd) {
