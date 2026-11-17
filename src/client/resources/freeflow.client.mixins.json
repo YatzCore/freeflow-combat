@@ -7,9 +7,11 @@
 		"DeltaTrackerTimerMixin",
 		"GameRendererMixin",
 		"EntityTurnMixin",
+		"ItemInHandLayerMixin",
 		"KeyboardInputMixin",
 		"LivingEntityRendererMixin",
-		"MinecraftMixin"
+		"MinecraftMixin",
+		"ModelPartMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

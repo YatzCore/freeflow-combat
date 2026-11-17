@@ -26,6 +26,10 @@ import java.util.List;
  * the sky, plays each animation on the player (and reaction animations on a zombie) in front
  * of a fixed camera, and writes one contact sheet per animation (frames left to right) to
  * run/screenshots/freeflow_preview/. Then it closes the game.
+ *
+ * <pre>FREEFLOW_PREVIEW=1 ./gradlew runClient --args="--quickPlaySingleplayer \"New World (1)\""</pre>
+ *
+ * (tools/preview.py draws the same clips without the game, for quick pose work.)
  */
 public final class AnimationPreview {
 	private AnimationPreview() {}
@@ -35,6 +39,9 @@ public final class AnimationPreview {
 	private static final double PX = 0.5;
 	private static final double PY = 201.0;
 	private static final double PZ = 0.5;
+
+	/** Height of the local player's lowest point above the floor (blocks) as last measured while drawing. */
+	public static float lowest = Float.NaN;
 
 	/** Fixed preview camera, read by CameraMixin while the preview runs. */
 	@Nullable
@@ -55,9 +62,12 @@ public final class AnimationPreview {
 
 	/** Player animations to preview, with the frame times (ticks) to capture. */
 	private static final String[] PLAYER_ANIMS = {
-			"roll", "evade", "vault", "slide", "run", "ground_takedown", "jab_right", "hook_right", "front_kick",
-			"haymaker", "side_kick", "flying_kick", "finisher", "counter", "counter_kick", "counter_throw", "special_takedown"};
-	private static final int[] FRAMES = {1, 3, 5, 7, 10};
+			"stance", "shuffle", "advance", "run", "jab_left", "jab_right", "hook_right", "hook_left", "elbow", "knee",
+			"front_kick", "side_kick", "spin_backfist", "haymaker", "flying_kick", "flying_punch", "beatdown_right",
+			"finisher", "counter", "counter_kick", "counter_throw", "stun", "roll", "evade", "vault", "slide",
+			"ground_takedown", "special_takedown", "throw_quick", "throw_aim", "throw_release", "claw_fire",
+			"claw_hold", "claw_pull", "claw_slam"};
+	private static final int[] FRAMES = {1, 2, 4, 6, 8, 11};
 
 	/** FREEFLOW_PREVIEW_ANIMS=a,b,c overrides the list; FREEFLOW_PREVIEW_FRAMES=1,4,8 the frame ticks;
 	 *  FREEFLOW_PREVIEW_ONLY_PLAYER=1 skips the enemy-reaction scenes. */
@@ -146,14 +156,55 @@ public final class AnimationPreview {
 		then(5, () -> command(mc, "summon minecraft:zombie " + PX + " " + PY + " " + (PZ + 2.0)
 				+ " {NoAI:1b,Rotation:[180f,0f],PersistenceRequired:1b,ArmorItems:[{},{},{},{id:\"minecraft:leather_helmet\",count:1}]}"));
 		then(10, () -> lookAt(new Vec3(PX + 5.0, PY + 1.2, PZ + 1.0), new Vec3(PX, PY + 0.8, PZ + 1.4)));
-		reaction(mc, MobReaction.HIT_MEDIUM, 10, 0, new int[] {2, 5, 8});
+		reaction(mc, MobReaction.HIT_LIGHT, 7, 0, new int[] {1, 3, 6});
+		reaction(mc, MobReaction.HIT_MEDIUM, 10, 0, new int[] {1, 4, 8});
 		reaction(mc, MobReaction.WINDUP, 12, 0, new int[] {3, 8, 12});
-		reaction(mc, MobReaction.ATTACK, 6, 0, new int[] {1, 3, 5});
+		reaction(mc, MobReaction.ATTACK, 6, 0, new int[] {1, 2, 5});
 		reaction(mc, MobReaction.LAUNCHED, 16, 0, new int[] {2, 5, 8, 11, 15});
-		reaction(mc, MobReaction.KNOCKED_DOWN, 50, 0, new int[] {2, 5, 9, 14, 30, 36, 42, 49});
-		reaction(mc, MobReaction.COUNTERED, 30, MobReaction.COUNTER_THROW, new int[] {2, 5, 8, 11, 15, 25});
+		reaction(mc, MobReaction.KNOCKED_DOWN, 50, 0, new int[] {2, 5, 8, 14, 37, 41, 45, 49});
+		reaction(mc, MobReaction.COUNTERED, 40, MobReaction.COUNTER_THROW, new int[] {1, 4, 6, 9, 12, 20});
+		reaction(mc, MobReaction.COUNTERED, 30, MobReaction.COUNTER_STRIKE, new int[] {2, 5, 8, 14, 24});
 		reaction(mc, MobReaction.STUNNED, 30, 0, new int[] {5, 15, 25});
+		reaction(mc, MobReaction.KNOCKED_OUT, 30, 0, new int[] {1, 4, 7, 12, 25});
 		then(30, () -> command(mc, "kill @e[type=minecraft:zombie]"));
+
+		// --- in a fight: guard stance, hit-aligned strikes out of it and back into it ---
+		then(1, () -> {
+			CombatAnimations.previewFighting = true;
+			lookAt(new Vec3(PX + 2.8, PY + 1.1, PZ + 0.6), new Vec3(PX, PY + 0.9, PZ));
+		});
+		then(14, () -> { });
+		scene(mc, "fight_stance_cross", () -> CombatAnimations.playLocal("jab_right", 1), new int[] {0, 1, 2, 4, 8, 12, 18});
+		scene(mc, "fight_spin_backfist", () -> CombatAnimations.playLocal("spin_backfist", 1), new int[] {1, 2, 3, 5, 7, 9, 14});
+		scene(mc, "fight_flying_punch", () -> CombatAnimations.playLocal("flying_punch", 4), new int[] {1, 2, 3, 4, 5, 8, 12});
+
+		// --- paired counters: the enemy winds up, the counter and its reaction start together ---
+		// (it holds a sword and wears a chestplate: what a hand holds must follow a bent forearm, and armour must bend)
+		then(5, () -> command(mc, "summon minecraft:zombie " + PX + " " + PY + " " + (PZ + 1.7)
+				+ " {NoAI:1b,Rotation:[180f,0f],PersistenceRequired:1b,HandItems:[{id:\"minecraft:iron_sword\",count:1},{}],"
+				+ "ArmorItems:[{},{},{id:\"minecraft:iron_chestplate\",count:1},{id:\"minecraft:leather_helmet\",count:1}]}"));
+		then(10, () -> lookAt(new Vec3(PX + 4.2, PY + 1.3, PZ + 0.9), new Vec3(PX, PY + 0.9, PZ + 0.9)));
+		pair(mc, "pair_counter", "counter", MobReaction.COUNTER_STRIKE, 30, new int[] {1, 2, 3, 5, 8, 13, 20});
+		pair(mc, "pair_counter_kick", "counter_kick", MobReaction.COUNTER_KICK, 30, new int[] {1, 2, 3, 5, 8, 13, 20});
+		pair(mc, "pair_counter_throw", "counter_throw", MobReaction.COUNTER_THROW, 40, new int[] {1, 2, 4, 6, 9, 12, 16});
+
+		// --- gadgets: the player's move and the enemy's reaction, started as the gadget code will ---
+		gadget(mc, "pair_throw_quick", "throw_quick", 2, MobReaction.GADGET_STRUCK, 30, new int[] {1, 2, 3, 5, 8, 13, 20});
+		gadget(mc, "pair_throw_release", "throw_release", 2, MobReaction.GADGET_STRUCK, 30, new int[] {1, 2, 3, 5, 8, 13, 20});
+		gadget(mc, "pair_claw_fire", "claw_fire", 2, MobReaction.HOOKED, 20, new int[] {1, 2, 3, 4, 6, 9, 14});
+		gadget(mc, "pair_claw_pull", "claw_pull", 2, MobReaction.PULLED, 30, new int[] {1, 2, 4, 6, 9, 13, 18});
+		gadget(mc, "pair_claw_slam", "claw_slam", 2, MobReaction.CLOTHESLINED, 45, new int[] {1, 2, 4, 6, 8, 12, 30});
+
+		// --- reaction chains ---
+		chain(mc, "chain_dazed_hit", MobReaction.STUNNED, 40, 0, 10, MobReaction.HIT_LIGHT, 7, new int[] {1, 3, 6, 10, 16});
+		chain(mc, "chain_armed_swing", MobReaction.WINDUP, 12, 1, 12, MobReaction.ATTACK, 6, new int[] {1, 2, 4, 7, 10});
+		chain(mc, "chain_sword_windup", MobReaction.HIT_LIGHT, 7, 0, 12, MobReaction.WINDUP, 12, new int[] {2, 4, 7, 10, 12});
+		chain(mc, "chain_sword_swing", MobReaction.WINDUP, 12, 0, 12, MobReaction.ATTACK, 6, new int[] {1, 2, 4, 7, 10});
+		chain(mc, "chain_down_then_out", MobReaction.KNOCKED_DOWN, 60, 0, 22, MobReaction.KNOCKED_OUT, 30, new int[] {1, 2, 4, 8, 14});
+		then(30, () -> {
+			command(mc, "kill @e[type=minecraft:zombie]");
+			CombatAnimations.previewFighting = false;
+		});
 
 		// --- ground takedown: zombie lying beside the player, three-quarter view ---
 		// Zombie faces -X so it lies along +X; its chest ends up right in front of the player.
@@ -173,7 +224,7 @@ public final class AnimationPreview {
 			beginSheet("takedown_ground");
 		});
 		int last = 0;
-		for (int f : new int[] {2, 4, 6, 9, 12, 16}) {
+		for (int f : new int[] {3, 8, 14, 18, 20, 23, 29}) {
 			then(Math.max(0, f - last - 1), () -> { });
 			then(0, () -> capture(mc));
 			last = f;
@@ -187,13 +238,93 @@ public final class AnimationPreview {
 		});
 	}
 
+	/** One sheet: run {@code start}, then capture on the given ticks after it. */
+	private static void scene(Minecraft mc, String name, Runnable start, int[] at) {
+		then(0, () -> {
+			facePlayer(mc, 0f);
+			beginSheet(name);
+			start.run();
+		});
+		int last = 0;
+		for (int f : at) {
+			then(Math.max(0, f - last - 1), () -> { });
+			then(0, () -> capture(mc));
+			last = f;
+		}
+		then(16, () -> endSheet(mc));
+	}
+
+	/** The zombie winds up, then the player's counter and the zombie's reaction start on the same tick. */
+	private static void pair(Minecraft mc, String name, String counter, int variant, int ticks, int[] at) {
+		then(12, () -> {
+			Zombie z = zombie(mc);
+			if (z != null) {
+				MobAnimator.onReaction(new MobReactionPayload(z.getId(), MobReaction.WINDUP, 12, 0, mc.player.getId()));
+			}
+		});
+		scene(mc, name, () -> {
+			Zombie z = zombie(mc);
+			if (z != null) {
+				MobAnimator.onReaction(new MobReactionPayload(z.getId(), MobReaction.COUNTERED, ticks, variant, mc.player.getId()));
+			}
+			CombatAnimations.playLocal(counter, 1);
+		}, at);
+		then(ticks, () -> { });
+	}
+
+	/**
+	 * A gadget move on the player with its moment {@code lead} ticks away, and the enemy's reaction
+	 * sent on that tick (as the gadget code will do it).
+	 */
+	private static void gadget(Minecraft mc, String name, String move, int lead, MobReaction reaction, int ticks, int[] at) {
+		then(8, () -> { });
+		then(0, () -> {
+			facePlayer(mc, 0f);
+			beginSheet(name);
+			CombatAnimations.playLocal(move, lead);
+		});
+		then(lead - 1, () -> { });
+		then(0, () -> {
+			Zombie z = zombie(mc);
+			if (z != null) {
+				MobAnimator.onReaction(new MobReactionPayload(z.getId(), reaction, ticks, 0, mc.player.getId()));
+			}
+		});
+		int last = lead;
+		for (int f : at) {
+			int tick = f + lead;
+			then(Math.max(0, tick - last - 1), () -> { });
+			then(0, () -> capture(mc));
+			last = tick;
+		}
+		then(ticks + 8, () -> endSheet(mc));
+	}
+
+	/** A reaction, then {@code gap} ticks later a second one on top of it; the sheet shows the second. */
+	private static void chain(Minecraft mc, String name, MobReaction first, int firstTicks, int firstParam, int gap,
+			MobReaction second, int secondTicks, int[] at) {
+		then(gap, () -> {
+			Zombie z = zombie(mc);
+			if (z != null) {
+				MobAnimator.onReaction(new MobReactionPayload(z.getId(), first, firstTicks, firstParam, mc.player.getId()));
+			}
+		});
+		scene(mc, name, () -> {
+			Zombie z = zombie(mc);
+			if (z != null) {
+				MobAnimator.onReaction(new MobReactionPayload(z.getId(), second, secondTicks, 0, mc.player.getId()));
+			}
+		}, at);
+		then(firstTicks, () -> { });
+	}
+
 	private static void reaction(Minecraft mc, MobReaction reaction, int ticks, int param, int[] at) {
 		then(1, () -> {
 			Zombie z = zombie(mc);
 			if (z != null) {
 				MobAnimator.onReaction(new MobReactionPayload(z.getId(), reaction, ticks, param, mc.player.getId()));
 			}
-			beginSheet("mob_" + reaction.name().toLowerCase() + (param != 0 ? "_" + param : ""));
+			beginSheet("mob_" + reaction.name().toLowerCase() + (reaction == MobReaction.COUNTERED ? "_" + param : ""));
 		});
 		int last = 0;
 		for (int f : at) {
@@ -244,8 +375,9 @@ public final class AnimationPreview {
 	}
 
 	private static void capture(Minecraft mc) {
-		FreeflowMod.LOGGER.info("[preview] {} frame {}: {}, pos {}, pose {}", sheetName, frames.size(),
-				CombatAnimations.debugState(), mc.player.position(), mc.player.getPose());
+		FreeflowMod.LOGGER.info("[preview] {} frame {}: {}, lowest {} px, joints {}", sheetName, frames.size(),
+				CombatAnimations.debugState(), String.format(java.util.Locale.ROOT, "%.2f", lowest * 16f),
+				CombatAnimations.debugBends());
 		frames.add(Screenshot.takeScreenshot(mc.getMainRenderTarget()));
 	}
 

@@ -10,7 +10,7 @@ import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Drives the local player through rolls, vaults, back-flips and slides (movement is
+ * Drives the local player through rolls, vaults, back handsprings and slides (movement is
  * client-side). Rolls and slides turn the player to face the way they go (so the roll and
  * slide animations point the right way); vaults hop through the enemy and land facing it;
  * slides start fast and slow down.
@@ -75,9 +75,8 @@ public final class EvadeController {
 		double y = player.getDeltaMovement().y;
 		if (firstTick && mode == EvadePayload.VAULT && player.onGround()) {
 			y = 0.45; // hop over the enemy
-		} else if (firstTick && mode == EvadePayload.BACKFLIP && player.onGround()) {
-			y = 0.3;
 		}
+		// (the back handspring stays on the ground: its height is all in the animation)
 		firstTick = false;
 		player.setDeltaMovement(direction.x * step, y, direction.z * step);
 		if (mode == EvadePayload.ROLL || mode == EvadePayload.SLIDE) {

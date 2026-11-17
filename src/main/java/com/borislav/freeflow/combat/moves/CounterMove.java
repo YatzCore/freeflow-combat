@@ -136,7 +136,7 @@ public class CounterMove implements Move {
 		state.lastCounterVariant = MobReaction.COUNTER_KICK;
 		state.fight.record(FightStats.MoveType.COUNTER_KICK);
 		ComboTracker.onHit(player, state);
-		Anim.play(player, Anim.COUNTER_KICK);
+		Anim.play(player, Anim.COUNTER_KICK, 1);
 		MobReaction.send(creeper, creeper.isAlive() ? MobReaction.COUNTERED : MobReaction.KNOCKED_OUT,
 				FreeflowConfig.counterStunTicks, MobReaction.COUNTER_KICK, player);
 		ImpactFx.hit(player, creeper, Anim.HEAVY);
@@ -165,19 +165,19 @@ public class CounterMove implements Move {
 				mob.hurtMarked = true;
 				EnemyStatus.knockDown(player, state, mob, FreeflowConfig.counterThrowDownTicks);
 				downTicks = FreeflowConfig.counterThrowDownTicks;
-				Anim.play(player, Anim.COUNTER_THROW);
+				Anim.play(player, Anim.COUNTER_THROW, 1);
 			}
 			case MobReaction.COUNTER_KICK -> {
 				ImpactFx.knockback(player, mob, Anim.HEAVY);
 				EnemyStatus.stun(player, state, mob, FreeflowConfig.counterStunTicks);
 				downTicks = FreeflowConfig.counterStunTicks;
-				Anim.play(player, Anim.COUNTER_KICK);
+				Anim.play(player, Anim.COUNTER_KICK, 1);
 			}
 			default -> {
 				mob.knockback(FreeflowConfig.counterKnockback, player.getX() - mob.getX(), player.getZ() - mob.getZ());
 				EnemyStatus.stun(player, state, mob, FreeflowConfig.counterStunTicks); // cancels the attack too
 				downTicks = FreeflowConfig.counterStunTicks;
-				Anim.play(player, Anim.COUNTER);
+				Anim.play(player, Anim.COUNTER, 1);
 			}
 		}
 		slot.nextAllowed = Math.max(slot.nextAllowed, now + downTicks + FreeflowConfig.enemyAttackCooldownMin);

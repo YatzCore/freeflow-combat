@@ -152,6 +152,8 @@ public final class FreeflowConfig {
 	public static int groundTakedownTicks = 20;
 	/** Combo needed (and spent) for a special takedown. */
 	public static int specialTakedownCost = 8;
+	/** A special takedown's blow lands at least this many ticks after the press (its leap). */
+	public static int specialTakedownWindupTicks = 5;
 	/** Mobs with more max health than this are "bosses": takedowns only deal heavy damage. */
 	public static float bossHealthThreshold = 50.0f;
 	public static float bossTakedownDamage = 12.0f;

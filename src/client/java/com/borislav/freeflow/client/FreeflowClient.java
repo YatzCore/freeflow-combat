@@ -58,7 +58,7 @@ public class FreeflowClient implements ClientModInitializer {
 			CinematicShots.tick();
 			TargetIndicator.tick(client);
 			MobAnimator.tick(client);
-			CombatAnimations.tickRun(client);
+			CombatAnimations.tickLocomotion(client);
 			AnimationPreview.tick(client);
 		});
 		HudRenderCallback.EVENT.register(ComboHud::render);
@@ -92,6 +92,7 @@ public class FreeflowClient implements ClientModInitializer {
 			ClientCombo.onEvent(payload);
 			switch (payload.event()) {
 				case STUN -> LungeController.faceEntity(payload.mobId());
+				case TAKEDOWN_START -> MobAnimator.holdDown(payload.mobId(), payload.ticks());
 				case TAKEDOWN, SPECIAL_TAKEDOWN, FINAL_HIT -> CinematicShots.start(payload.mobId());
 				default -> {}
 			}

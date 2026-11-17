@@ -36,7 +36,7 @@ public class StunMove implements Move {
 		}
 
 		EnemyStatus.stun(player, state, target, FreeflowConfig.stunTicks);
-		Anim.play(player, Anim.STUN);
+		Anim.play(player, Anim.STUN, 1);
 		state.fight.record(FightStats.MoveType.STUN);
 		state.lastStrikeMob = target;
 		state.stunCooldownUntil = now + FreeflowConfig.stunCooldownTicks;

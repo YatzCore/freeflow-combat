@@ -1,0 +1,118 @@
+{
+ "jab_left": {
+  "impact": 2,
+  "length": 9
+ },
+ "jab_right": {
+  "impact": 2,
+  "length": 10
+ },
+ "hook_right": {
+  "impact": 2,
+  "length": 10
+ },
+ "hook_left": {
+  "impact": 2,
+  "length": 10
+ },
+ "elbow": {
+  "impact": 2,
+  "length": 10
+ },
+ "knee": {
+  "impact": 2,
+  "length": 10
+ },
+ "front_kick": {
+  "impact": 2,
+  "length": 11
+ },
+ "side_kick": {
+  "impact": 2,
+  "length": 12
+ },
+ "spin_backfist": {
+  "impact": 2,
+  "length": 11
+ },
+ "haymaker": {
+  "impact": 2,
+  "length": 13
+ },
+ "flying_kick": {
+  "impact": 7,
+  "length": 16
+ },
+ "flying_punch": {
+  "impact": 7,
+  "length": 16
+ },
+ "beatdown_right": {
+  "impact": 1,
+  "length": 6
+ },
+ "beatdown_left": {
+  "impact": 1,
+  "length": 6
+ },
+ "finisher": {
+  "impact": 0,
+  "length": 13
+ },
+ "counter": {
+  "impact": 6,
+  "length": 15
+ },
+ "counter_kick": {
+  "impact": 6,
+  "length": 16
+ },
+ "counter_throw": {
+  "impact": 4,
+  "length": 15
+ },
+ "counter_double": {
+  "impact": 7,
+  "length": 17
+ },
+ "counter_triple": {
+  "impact": 6,
+  "length": 24
+ },
+ "counter_quad": {
+  "impact": 6,
+  "length": 24
+ },
+ "stun": {
+  "impact": 2,
+  "length": 11
+ },
+ "ground_takedown": {
+  "impact": 20,
+  "length": 31
+ },
+ "special_takedown": {
+  "impact": 7,
+  "length": 19
+ },
+ "throw_quick": {
+  "impact": 2,
+  "length": 11
+ },
+ "throw_release": {
+  "impact": 2,
+  "length": 12
+ },
+ "claw_fire": {
+  "impact": 2,
+  "length": 20
+ },
+ "claw_pull": {
+  "impact": 2,
+  "length": 13
+ },
+ "claw_slam": {
+  "impact": 2,
+  "length": 12
+ }
+}

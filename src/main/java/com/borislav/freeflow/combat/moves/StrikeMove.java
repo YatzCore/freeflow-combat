@@ -129,7 +129,7 @@ public class StrikeMove implements Move {
 			state.strikeTarget = null;
 			state.nextStrikeTick = now + FreeflowConfig.whiffRecoveryTicks;
 			ComboTracker.breakCombo(player, state); // swinging at air breaks the flow
-			Anim.play(player, Anim.chooseStrike(state.strikeIndex, 0, 0));
+			Anim.play(player, Anim.chooseStrike(state.strikeIndex, 0, 0), 1);
 			send(player, -1, 0);
 			return;
 		}
@@ -151,13 +151,15 @@ public class StrikeMove implements Move {
 				: Anim.chooseStrike(state.strikeIndex, travel, state.combo);
 		state.strikeStrength = Anim.strength(move);
 		state.strikeMove = move;
-		Anim.play(player, move);
+		// A special takedown always gets its wind-up, even point blank.
+		int hitDelay = special ? Math.max(travel, FreeflowConfig.specialTakedownWindupTicks) : Math.max(1, travel);
+		Anim.play(player, move, hitDelay);
 
 		state.strikeTarget = target;
 		state.strikeIsSpecial = special;
 		state.lastStrikeMob = target;
-		state.strikeHitTick = now + Math.max(1, travel);
-		state.invulnerableUntil = Math.max(state.invulnerableUntil, now + travel + (special ? 6 : 2));
+		state.strikeHitTick = now + hitDelay;
+		state.invulnerableUntil = Math.max(state.invulnerableUntil, now + hitDelay + (special ? 6 : 2));
 		send(player, target.getId(), travel);
 	}
 

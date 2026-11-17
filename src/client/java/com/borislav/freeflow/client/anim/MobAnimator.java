@@ -2,7 +2,9 @@ package com.borislav.freeflow.client.anim;
 
 import com.borislav.freeflow.ai.MobReaction;
 import com.borislav.freeflow.client.ClientCombo;
+import com.borislav.freeflow.config.FreeflowConfig;
 import com.borislav.freeflow.network.MobReactionPayload;
+import com.borislav.freeflow.network.TelegraphPayload;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import net.minecraft.client.Minecraft;
@@ -10,6 +12,7 @@ import net.minecraft.client.model.EntityModel;
 import net.minecraft.client.model.HierarchicalModel;
 import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.client.model.geom.ModelPart;
+import net.minecraft.client.model.geom.PartPose;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
@@ -20,37 +23,137 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Arkham-style enemy animation, driven by {@link MobReactionPayload}s from the server:
- * attack wind-ups and swings, head snaps, stagger-backs, backward rolls, stunned sway,
- * knock-downs (fall, lie, get up), knock-outs and paired counter reactions (incl. being
- * thrown over the player's shoulder).
+ * Enemy body language, driven by {@link MobReactionPayload}s from the server: wind-ups and
+ * swings, head snaps, staggers, being launched, dazed swaying, knock-downs (fall, lie, get up),
+ * knock-outs and the paired counter reactions (blocked, kicked away, thrown overhead).
  *
- * Two hooks (LivingEntityRendererMixin): {@link #applyBody} moves/rotates the whole body
- * (rolls, falls, throws) and {@link #applyPose} poses the limbs after vanilla setupAnim.
- * Humanoid and illager models get full poses; other mobs get whole-body motion only.
+ * Every reaction is a sequence of authored clips ({@link MobClips}). A new reaction always
+ * starts from the pose the enemy is in right now (an enemy that is already on the floor is
+ * finished on the floor, a dazed enemy that is hit goes back to being dazed), and the body is
+ * kept on the floor by {@link GroundFit} whatever the mob's shape.
+ *
+ * Hooks (LivingEntityRendererMixin): {@link #applyBody} turns the whole body, {@link #applyPose}
+ * poses the limbs after vanilla setupAnim, {@link #afterRender} gives the shared model back
+ * clean. Humanoid and illager models get full poses; other mobs get the whole-body motion.
  */
 public final class MobAnimator {
 	private MobAnimator() {}
 
-	private record State(MobReaction reaction, long start, int duration, int param, int attackerId) {}
+	private static final String WINDUP = "windup";
+	private static final String WINDUP_ARMED = "windup_armed";
+	private static final String ATTACK = "attack";
+	private static final String ATTACK_ARMED = "attack_armed";
+	private static final String HIT_LIGHT_L = "hit_light_l";
+	private static final String HIT_LIGHT_R = "hit_light_r";
+	private static final String HIT_MEDIUM = "hit_medium";
+	private static final String LAUNCHED = "launched";
+	private static final String STUNNED = "stunned";
+	private static final String FALL_BACK = "fall_back";
+	private static final String GET_UP = "get_up";
+	private static final String KO_FALL = "ko_fall";
+	private static final String KO_GROUND = "ko_ground";
+	private static final String COUNTERED_STRIKE = "countered_strike";
+	private static final String COUNTERED_KICK = "countered_kick";
+	private static final String THROWN = "thrown";
+	private static final String BLADE_STRUCK = "blade_struck";
+	private static final String HOOKED = "hooked";
+	private static final String PULLED = "pulled";
+	private static final String CLOTHESLINED = "clotheslined";
+
+	/** Ticks to move from the previous pose into a new reaction. */
+	private static final float BLEND_IN = 2f;
+	/** Ticks to hand back to the vanilla animation after a reaction ends. */
+	private static final float BLEND_OUT = 4f;
+	/** Ticks to cross-fade between the clips inside one reaction. */
+	private static final float CROSS = 3f;
+
+	private static final class State {
+		final MobReaction reaction;
+		final long start;
+		int duration;
+		final int param;
+		final int attackerId;
+		/** Pose (and its weight) the enemy was in when this reaction began; null = vanilla. */
+		@Nullable float[] from;
+		float fromWeight;
+		/** Already lying on the floor when this reaction began. */
+		boolean wasDown;
+		/** The swing follows an armed (two-handed) wind-up. */
+		boolean armed;
+		/** Which way a light hit snaps the head. */
+		boolean hitFromRight;
+		/** Dazed swaying continues after the opening clip until this many ticks in (0 = no). */
+		int dazedUntil;
+
+		State(MobReaction reaction, long start, int duration, int param, int attackerId) {
+			this.reaction = reaction;
+			this.start = start;
+			this.duration = duration;
+			this.param = param;
+			this.attackerId = attackerId;
+		}
+	}
 
 	private record Parts(ModelPart head, ModelPart body, ModelPart rightArm, ModelPart leftArm,
-			ModelPart rightLeg, ModelPart leftLeg, @Nullable ModelPart hat) {}
+			ModelPart rightLeg, ModelPart leftLeg, @Nullable ModelPart hat) {
+		ModelPart[] all() {
+			return new ModelPart[] {head, body, rightArm, leftArm, rightLeg, leftLeg};
+		}
+
+		ModelPart[] limbs() {
+			return new ModelPart[] {rightArm, leftArm, rightLeg, leftLeg};
+		}
+	}
+
+	/** What the renderer should show right now: an absolute pose and how much of it (vs vanilla). */
+	private record Shown(float[] pose, float weight) {}
 
 	private static final Map<Integer, State> STATES = new HashMap<>();
 
-	private static final int FALL_TICKS = 6;
-	private static final int GET_UP_TICKS = 10;
-	private static final int THROW_TICKS = 12;
-	private static final int ROLL_TICKS = 12;
+	// ------------------------------------------------------------------ state
 
 	public static void onReaction(MobReactionPayload payload) {
-		State current = STATES.get(payload.mobId());
-		if (current != null && current.reaction() == MobReaction.KNOCKED_OUT) {
+		int id = payload.mobId();
+		State old = STATES.get(id);
+		if (old != null && old.reaction == MobReaction.KNOCKED_OUT) {
 			return; // knocked out stays down
 		}
-		STATES.put(payload.mobId(), new State(payload.reaction(), ClientCombo.clientTick,
-				Math.max(1, payload.ticks()), payload.param(), payload.attackerId()));
+		long now = ClientCombo.clientTick;
+		State s = new State(payload.reaction(), now, Math.max(1, payload.ticks()), payload.param(), payload.attackerId());
+
+		if (old != null) {
+			float age = now - old.start;
+			Shown shown = shown(old, age);
+			if (shown != null) {
+				s.from = shown.pose();
+				s.fromWeight = shown.weight();
+			}
+			s.wasDown = isLying(old, age);
+			s.armed = old.reaction == MobReaction.WINDUP && old.param == TelegraphPayload.ARMED;
+
+			// A dazed enemy that takes a hit goes back to being dazed afterwards.
+			int dazedLeft = dazedLeft(old, age);
+			if (dazedLeft > 0 && (s.reaction == MobReaction.HIT_LIGHT || s.reaction == MobReaction.HIT_MEDIUM)) {
+				s.dazedUntil = Math.max(dazedLeft, FreeflowConfig.beatdownStunExtendTicks);
+				s.duration = Math.max(s.duration, s.dazedUntil);
+			}
+		}
+		if ((s.reaction == MobReaction.COUNTERED && s.param != MobReaction.COUNTER_THROW)
+				|| s.reaction == MobReaction.GADGET_STRUCK || s.reaction == MobReaction.PULLED) {
+			s.dazedUntil = s.duration;
+		}
+		if (s.reaction == MobReaction.HIT_LIGHT) {
+			s.hitFromRight = attackerOnRight(id, s.attackerId);
+		}
+		STATES.put(id, s);
+	}
+
+	/** A ground takedown has started on this enemy: it must not get up in the middle of it. */
+	public static void holdDown(int mobId, int ticks) {
+		State s = STATES.get(mobId);
+		if (s != null && isDownReaction(s)) {
+			s.duration = Math.max(s.duration, (int) (ClientCombo.clientTick - s.start) + ticks + MobClips.length(GET_UP));
+		}
 	}
 
 	public static void tick(Minecraft mc) {
@@ -60,15 +163,13 @@ public final class MobAnimator {
 		}
 		STATES.entrySet().removeIf(e -> {
 			State s = e.getValue();
-			Entity entity = mc.level.getEntity(e.getKey());
-			if (entity == null) {
+			if (mc.level.getEntity(e.getKey()) == null) {
 				return true;
 			}
-			if (s.reaction() == MobReaction.KNOCKED_OUT) {
+			if (s.reaction == MobReaction.KNOCKED_OUT) {
 				return false; // until the entity is removed
 			}
-			long age = ClientCombo.clientTick - s.start();
-			return age > s.duration() + 4;
+			return ClientCombo.clientTick - s.start > s.duration + BLEND_OUT + 1;
 		});
 	}
 
@@ -81,359 +182,268 @@ public final class MobAnimator {
 		return entity instanceof Mob ? STATES.get(entity.getId()) : null;
 	}
 
+	private static boolean isDownReaction(State s) {
+		return s.reaction == MobReaction.KNOCKED_DOWN || s.reaction == MobReaction.CLOTHESLINED
+				|| (s.reaction == MobReaction.COUNTERED && s.param == MobReaction.COUNTER_THROW);
+	}
+
+	/** The clip that puts the enemy on the floor in a "down" reaction. */
+	private static String fallClip(State s) {
+		return switch (s.reaction) {
+			case COUNTERED -> THROWN;
+			case CLOTHESLINED -> CLOTHESLINED;
+			default -> FALL_BACK;
+		};
+	}
+
+	/** True while the reaction has the enemy flat on the floor. */
+	private static boolean isLying(State s, float t) {
+		if (s.reaction == MobReaction.KNOCKED_OUT) {
+			return t >= MobClips.length(s.wasDown ? KO_GROUND : KO_FALL) - 4;
+		}
+		if (!isDownReaction(s)) {
+			return false;
+		}
+		int fall = s.wasDown ? 0 : MobClips.length(fallClip(s));
+		return t >= fall - 3 && t <= s.duration - MobClips.length(GET_UP) + 4;
+	}
+
+	/** Ticks of dazed swaying this reaction still has ahead of it. */
+	private static int dazedLeft(State s, float t) {
+		if (s.reaction == MobReaction.STUNNED) {
+			return Math.round(s.duration - t);
+		}
+		return s.dazedUntil > 0 ? Math.round(s.dazedUntil - t) : 0;
+	}
+
+	private static boolean attackerOnRight(int mobId, int attackerId) {
+		Minecraft mc = Minecraft.getInstance();
+		if (mc.level == null || attackerId < 0) {
+			return (mobId & 1) == 0;
+		}
+		Entity mob = mc.level.getEntity(mobId);
+		Entity attacker = mc.level.getEntity(attackerId);
+		if (!(mob instanceof LivingEntity living) || attacker == null) {
+			return (mobId & 1) == 0;
+		}
+		// Hits come from in front, so alternate with the striking hand: use the attacker's own
+		// angle to break the tie when it stands off to one side.
+		float toAttacker = (float) Math.toDegrees(Math.atan2(-(attacker.getX() - mob.getX()), attacker.getZ() - mob.getZ()));
+		float off = Mth.wrapDegrees(toAttacker - living.yBodyRot);
+		if (Math.abs(off) > 25f) {
+			return off > 0;
+		}
+		return ((ClientCombo.clientTick / 3) & 1) == 0;
+	}
+
+	// ------------------------------------------------------------------ timelines
+
+	/** The reaction's own pose at {@code t} ticks in (before blending in or out); null = none. */
+	@Nullable
+	private static float[] timeline(State s, float t) {
+		return switch (s.reaction) {
+			case WINDUP -> switch (s.param) {
+				case TelegraphPayload.RANGED -> null; // the bow draw is vanilla's
+				case TelegraphPayload.ARMED -> MobClips.sample(WINDUP_ARMED, t);
+				default -> MobClips.sample(WINDUP, t);
+			};
+			case ATTACK -> MobClips.sample(s.armed ? ATTACK_ARMED : ATTACK, t);
+			case HIT_LIGHT -> thenDazed(s, s.hitFromRight ? HIT_LIGHT_R : HIT_LIGHT_L, t);
+			case HIT_MEDIUM -> thenDazed(s, HIT_MEDIUM, t);
+			case LAUNCHED -> MobClips.sample(LAUNCHED, t);
+			case STUNNED -> MobClips.loop(STUNNED, t);
+			case KNOCKED_DOWN -> down(s, FALL_BACK, t);
+			case KNOCKED_OUT -> MobClips.sample(s.wasDown ? KO_GROUND : KO_FALL, t);
+			case GADGET_STRUCK -> thenDazed(s, BLADE_STRUCK, t);
+			case HOOKED -> MobClips.sample(HOOKED, t);
+			case PULLED -> thenDazed(s, PULLED, t);
+			case CLOTHESLINED -> down(s, CLOTHESLINED, t);
+			case COUNTERED -> switch (s.param) {
+				case MobReaction.COUNTER_THROW -> down(s, THROWN, t);
+				case MobReaction.COUNTER_KICK -> thenDazed(s, COUNTERED_KICK, t);
+				default -> thenDazed(s, COUNTERED_STRIKE, t);
+			};
+		};
+	}
+
+	/** An opening clip, then (if the enemy is dazed) the dazed sway. */
+	@Nullable
+	private static float[] thenDazed(State s, String clip, float t) {
+		int len = MobClips.length(clip);
+		if (t <= len || s.dazedUntil <= len) {
+			return MobClips.sample(clip, t);
+		}
+		float[] end = MobClips.last(clip);
+		float[] sway = MobClips.loop(STUNNED, t - len);
+		if (end == null || sway == null) {
+			return end;
+		}
+		return MobClips.mix(end, sway, smooth((t - len) / CROSS), true);
+	}
+
+	/** Falls (unless already down), lies still, gets up over the end of the reaction. */
+	@Nullable
+	private static float[] down(State s, String fallClip, float t) {
+		int up = MobClips.length(GET_UP);
+		if (up > 0 && t > s.duration - up) {
+			return MobClips.sample(GET_UP, t - (s.duration - up));
+		}
+		if (s.wasDown) {
+			return MobClips.first(GET_UP);
+		}
+		return MobClips.sample(fallClip, t);
+	}
+
+	/** Pose and weight to draw at {@code t} ticks into the reaction; null if it has no pose. */
+	@Nullable
+	private static Shown shown(State s, float t) {
+		float[] pose = timeline(s, t);
+		if (pose == null) {
+			return null;
+		}
+		float weight = 1f;
+		if (t < BLEND_IN) {
+			float k = smooth(t / BLEND_IN);
+			if (s.from != null) {
+				pose = MobClips.mix(s.from, pose, k, true);
+				weight = Mth.lerp(k, s.fromWeight, 1f);
+			} else {
+				weight = k;
+			}
+		}
+		if (s.reaction != MobReaction.KNOCKED_OUT && t > s.duration) {
+			weight *= Mth.clamp(1f - (t - s.duration) / BLEND_OUT, 0f, 1f);
+		}
+		return new Shown(pose, weight);
+	}
+
+	@Nullable
+	private static Shown shown(LivingEntity entity, float partialTick) {
+		State s = state(entity);
+		return s == null ? null : shown(s, Math.max(0f, ClientCombo.clientTick + partialTick - s.start));
+	}
+
+	// ------------------------------------------------------------------ render hooks
+
 	/** Keeps knocked-out mobs from doing the vanilla red tip-over (they fall our way instead). */
 	public static void beforeRender(LivingEntity entity) {
 		State s = state(entity);
-		if (s != null && s.reaction() == MobReaction.KNOCKED_OUT) {
+		if (s != null && s.reaction == MobReaction.KNOCKED_OUT) {
 			entity.deathTime = 0;
 		}
 	}
 
-	// ------------------------------------------------------------------ whole body
-
 	/**
-	 * Called at the end of setupRotations: the pose stack is at the mob's feet, rotated to its
-	 * body yaw. Local -Z is the mob's front, so +X rotation tips it backward.
+	 * Called at the end of setupRotations: the pose stack is at the mob's feet, turned to its
+	 * body yaw (x = its right, y = up, z = its back).
 	 */
-	public static void applyBody(LivingEntity entity, PoseStack pose, float partialTick) {
-		State s = state(entity);
-		if (s == null) {
+	public static void applyBody(LivingEntity entity, EntityModel<?> model, PoseStack pose, float partialTick) {
+		Shown shown = shown(entity, partialTick);
+		if (shown == null || shown.weight() <= 0f) {
 			return;
 		}
-		float t = ClientCombo.clientTick + partialTick - s.start();
-		float d = s.duration();
-		float h = entity.getBbHeight() / Math.max(0.01f, entity.getScale());
-
-		switch (s.reaction()) {
-			case HIT_MEDIUM -> tilt(pose, 22f * bell(t / d), 0);
-			case ATTACK -> tilt(pose, -14f * bell(t / d), 0); // lunges into the swing
-			case WINDUP -> {
-				if (s.param() != 2) {
-					tilt(pose, 10f * easeOut(clamp01(t / d)), 0); // leans back to load the hit
-				}
-			}
-			case LAUNCHED -> roll(pose, t, h);
-			case STUNNED -> sway(pose, t, fadeInOut(t, d, 4));
-			case KNOCKED_DOWN -> {
-				MobClips.Frame f = downFrame(t, d, true);
-				if (f != null) {
-					MobClips.applyBody(pose, f, h / 1.8f);
-				} else {
-					lie(pose, lyingAngle(t, d, true));
-				}
-			}
-			case KNOCKED_OUT -> {
-				MobClips.Frame f = downFrame(t, Float.MAX_VALUE, false);
-				if (f != null) {
-					MobClips.applyBody(pose, f, h / 1.8f);
-				} else {
-					lie(pose, lyingAngle(t, Float.MAX_VALUE, false));
-				}
-			}
-			case COUNTERED -> {
-				switch (s.param()) {
-					case MobReaction.COUNTER_THROW -> {
-					MobClips.Frame f = t >= THROW_TICKS ? lyingFrame(t, d) : null;
-					if (f != null) {
-						MobClips.applyBody(pose, f, h / 1.8f);
-					} else {
-						thrown(pose, t, d, h);
-					}
-				}
-					case MobReaction.COUNTER_KICK -> {
-						if (t < ROLL_TICKS + 2) {
-							roll(pose, t, h);
-						} else {
-							sway(pose, t, fadeInOut(t - ROLL_TICKS - 2, d - ROLL_TICKS - 2, 4));
-						}
-					}
-					default -> {
-						if (t < 10) {
-							tilt(pose, 26f * bell(t / 10f), 0);
-						} else {
-							sway(pose, t, fadeInOut(t - 10, d - 10, 4));
-						}
-					}
-				}
-			}
-			default -> {}
-		}
+		float[] p = shown.pose();
+		float w = shown.weight();
+		float hip = hipHeight(entity, model);
+		float size = hip / 0.75f;
+		pose.translate(p[MobClips.OFF_X] * size * w, hip, p[MobClips.OFF_Z] * size * w);
+		pose.mulPose(Axis.ZP.rotationDegrees(turn(p[MobClips.BODY_Z], w)));
+		pose.mulPose(Axis.YP.rotationDegrees(turn(p[MobClips.BODY_Y], w)));
+		pose.mulPose(Axis.XP.rotationDegrees(turn(p[MobClips.BODY_X], w)));
+		pose.translate(0f, -hip, 0f);
 	}
 
-	private static void tilt(PoseStack pose, float backDegrees, float sideDegrees) {
-		pose.mulPose(Axis.XP.rotationDegrees(backDegrees));
-		if (sideDegrees != 0) {
-			pose.mulPose(Axis.ZP.rotationDegrees(sideDegrees));
-		}
+	/** A whole-body angle at blend weight w (full turns are dropped while blending). */
+	private static float turn(float degrees, float w) {
+		return w >= 1f ? degrees : Mth.wrapDegrees(degrees) * w;
 	}
 
-	/** Knocked off its feet: a backward roll around the waist with a little air. */
-	private static void roll(PoseStack pose, float t, float h) {
-		float k = clamp01(t / ROLL_TICKS);
-		if (k >= 1f) {
-			tilt(pose, 12f * bell(clamp01((t - ROLL_TICKS) / 6f)), 0);
+	/** Called right after the model's setupAnim: poses the limbs and puts the body on the floor. */
+	public static void applyPose(LivingEntity entity, EntityModel<?> model, PoseStack pose, float partialTick) {
+		Shown shown = shown(entity, partialTick);
+		if (shown == null || shown.weight() <= 0f) {
 			return;
 		}
-		pose.translate(0, Math.sin(Math.PI * k) * 0.5 + h * 0.5, 0);
-		pose.mulPose(Axis.XP.rotationDegrees(360f * easeInOut(k)));
-		pose.translate(0, -h * 0.5, 0);
-	}
-
-	private static void sway(PoseStack pose, float t, float weight) {
-		if (weight <= 0) {
-			return;
-		}
-		pose.mulPose(Axis.ZP.rotationDegrees(7f * Mth.sin(t * 0.3f) * weight));
-		pose.mulPose(Axis.XP.rotationDegrees(5f * weight));
-	}
-
-	/** Lying on the back: angle 0 (standing) to 90 (flat), lifted so it doesn't sink into the floor. */
-	private static void lie(PoseStack pose, float angle) {
-		pose.translate(0, 0.15 * (angle / 90f), 0);
-		pose.mulPose(Axis.XP.rotationDegrees(angle));
-	}
-
-	/** Fall (with a bounce), lie, and (optionally) get up at the end of {@code d}. */
-	private static float lyingAngle(float t, float d, boolean getsUp) {
-		if (t < FALL_TICKS) {
-			return 90f * easeIn(t / FALL_TICKS);
-		}
-		if (t < FALL_TICKS + 4) {
-			return 90f - 9f * Mth.sin((float) Math.PI * (t - FALL_TICKS) / 4f);
-		}
-		if (getsUp && t > d - GET_UP_TICKS) {
-			return 90f * (1f - easeOut(clamp01((t - (d - GET_UP_TICKS)) / GET_UP_TICKS)));
-		}
-		return 90f;
-	}
-
-	/** Counter throw: flipped forward over the player, landing on its back, then getting up. */
-	private static void thrown(PoseStack pose, float t, float d, float h) {
-		if (t < THROW_TICKS) {
-			float k = clamp01(t / THROW_TICKS);
-			pose.translate(0, Math.sin(Math.PI * k) * 1.2 + h * 0.5 * (1 - k), 0);
-			pose.mulPose(Axis.XP.rotationDegrees(-270f * easeInOut(k)));
-			pose.translate(0, -h * 0.5 * (1 - k), 0);
-			return;
-		}
-		// -270 == +90: now lying on its back.
-		float lt = t - THROW_TICKS;
-		float angle = 90f;
-		if (lt < 3) {
-			angle = 90f - 10f * Mth.sin((float) Math.PI * lt / 3f);
-		} else if (t > d - GET_UP_TICKS) {
-			angle = 90f * (1f - easeOut(clamp01((t - (d - GET_UP_TICKS)) / GET_UP_TICKS)));
-		}
-		lie(pose, angle);
-	}
-
-	// ------------------------------------------------------------------ mocap (fall / lie / get up)
-
-	/** The motion-captured fall plays this much faster than recorded (snappier knockdowns). */
-	private static final float FALL_SPEED = 1.5f;
-
-	/** Knocked down: mocap fall onto the back, lie still, mocap get-up over the last part of {@code d}. */
-	@Nullable
-	private static MobClips.Frame downFrame(float t, float d, boolean getsUp) {
-		if (MobClips.length(MobClips.FALL_BACK) == 0) {
-			return null;
-		}
-		int up = MobClips.length(MobClips.GET_UP);
-		if (getsUp && up > 0 && t > d - up) {
-			return MobClips.sample(MobClips.GET_UP, t - (d - up));
-		}
-		return MobClips.sample(MobClips.FALL_BACK, t * FALL_SPEED);
-	}
-
-	/** Already on the ground (after a throw): hold the lying pose, then get up at the end. */
-	@Nullable
-	private static MobClips.Frame lyingFrame(float t, float d) {
-		if (MobClips.length(MobClips.FALL_BACK) == 0) {
-			return null;
-		}
-		int up = MobClips.length(MobClips.GET_UP);
-		if (up > 0 && t > d - up) {
-			return MobClips.sample(MobClips.GET_UP, t - (d - up));
-		}
-		return MobClips.sample(MobClips.FALL_BACK, Float.MAX_VALUE);
-	}
-
-	private static void clipLimbs(Parts p, MobClips.Frame f) {
-		MobClips.applyLimbs(p.head(), p.body(), p.rightArm(), p.leftArm(), p.rightLeg(), p.leftLeg(), f, 1f);
-	}
-
-	// ------------------------------------------------------------------ limbs
-
-	/** Called right after the model's setupAnim: overrides/adds to the limb angles. */
-	public static void applyPose(LivingEntity entity, EntityModel<?> model, float partialTick) {
-		State s = state(entity);
-		if (s == null) {
-			return;
-		}
-		Parts p = parts(model);
-		if (p == null) {
-			return;
-		}
-		float t = ClientCombo.clientTick + partialTick - s.start();
-		float d = s.duration();
-
-		switch (s.reaction()) {
-			case WINDUP -> windup(p, s.param(), easeOut(clamp01(t / d)));
-			case ATTACK -> attack(p, s.param(), clamp01(t / d));
-			case HIT_LIGHT -> headSnap(p, side(entity, s), bell(t / d));
-			case HIT_MEDIUM -> stagger(p, bell(t / d));
-			case LAUNCHED -> tuck(p, t < ROLL_TICKS ? bell(t / ROLL_TICKS) : 0);
-			case STUNNED -> dazed(p, t, fadeInOut(t, d, 4));
-			case KNOCKED_DOWN -> {
-				MobClips.Frame f = downFrame(t, d, true);
-				if (f != null) {
-					clipLimbs(p, f);
-				} else {
-					sprawl(p, lyingAngle(t, d, true) / 90f);
-				}
+		float[] p = shown.pose();
+		float w = shown.weight();
+		Parts parts = parts(model);
+		if (parts != null) {
+			ModelPart[] all = parts.all();
+			for (int i = 0; i < all.length; i++) {
+				set(all[i], p, MobClips.PARTS + i * MobClips.PART_SIZE, w);
 			}
-			case KNOCKED_OUT -> {
-				MobClips.Frame f = downFrame(t, Float.MAX_VALUE, false);
-				if (f != null) {
-					clipLimbs(p, f);
-				} else {
-					sprawl(p, lyingAngle(t, Float.MAX_VALUE, false) / 90f);
-				}
+			if (parts.hat() != null) {
+				parts.hat().copyFrom(parts.head());
 			}
-			case COUNTERED -> {
-				switch (s.param()) {
-					case MobReaction.COUNTER_THROW -> {
-						MobClips.Frame f = t >= THROW_TICKS ? lyingFrame(t, d) : null;
-						if (t < THROW_TICKS) {
-							flail(p, bell(t / THROW_TICKS));
-						} else if (f != null) {
-							clipLimbs(p, f);
-						} else {
-							float lt = t - THROW_TICKS;
-							float up = t > d - GET_UP_TICKS ? clamp01((t - (d - GET_UP_TICKS)) / GET_UP_TICKS) : 0;
-							sprawl(p, lt < 1 ? lt : 1f - up);
-						}
-					}
-					case MobReaction.COUNTER_KICK -> {
-						if (t < ROLL_TICKS + 2) {
-							tuck(p, bell(t / ROLL_TICKS));
-						} else {
-							dazed(p, t, fadeInOut(t - ROLL_TICKS - 2, d - ROLL_TICKS - 2, 4));
-						}
-					}
-					default -> {
-						if (t < 10) {
-							headSnap(p, side(entity, s), bell(t / 10f));
-							stagger(p, bell(t / 10f));
-						} else {
-							dazed(p, t, fadeInOut(t - 10, d - 10, 4));
-						}
-					}
-				}
+			ModelPart[] limbs = parts.limbs();
+			for (int i = 0; i < limbs.length; i++) {
+				int at = MobClips.BENDS + i * MobClips.BEND_SIZE;
+				BentLimbs.set(limbs[i], p[at] * w, p[at + 1]);
 			}
 		}
-		if (p.hat() != null) {
-			p.hat().copyFrom(p.head());
-		}
-	}
 
-	/** Wind-up: attacking arm cocked back overhead (armed: weapon raised with both hands). */
-	private static void windup(Parts p, int kind, float k) {
-		if (kind == 2) {
-			return; // ranged: the bow draw is already animated by vanilla
-		}
-		if (kind == 1) {
-			p.rightArm().xRot = Mth.lerp(k, p.rightArm().xRot, -3.0f);
-			p.leftArm().xRot = Mth.lerp(k, p.leftArm().xRot, -3.0f);
-			p.rightArm().zRot = Mth.lerp(k, p.rightArm().zRot, 0.25f);
-			p.leftArm().zRot = Mth.lerp(k, p.leftArm().zRot, -0.25f);
-		} else {
-			p.rightArm().xRot = Mth.lerp(k, p.rightArm().xRot, -2.9f);
-			p.rightArm().zRot = Mth.lerp(k, p.rightArm().zRot, -0.45f);
-			p.leftArm().xRot = Mth.lerp(k, p.leftArm().xRot, -0.9f);
-		}
-		p.head().xRot -= 0.15f * k;
-	}
-
-	/** The swing: fast chop from overhead to low, then settle back to the vanilla pose. */
-	private static void attack(Parts p, int kind, float k) {
-		float swing = k < 0.45f ? easeIn(k / 0.45f) : 1f;
-		float settle = k < 0.45f ? 0f : (k - 0.45f) / 0.55f;
-		float from = -2.9f;
-		float to = -0.2f;
-		float angle = Mth.lerp(swing, from, to);
-		p.rightArm().xRot = Mth.lerp(settle, angle, p.rightArm().xRot);
-		if (kind == 1) {
-			p.leftArm().xRot = Mth.lerp(settle, angle, p.leftArm().xRot);
-		}
-		p.body().xRot += 0.3f * bell(k);
-	}
-
-	private static void headSnap(Parts p, float side, float s) {
-		p.head().yRot += side * 0.75f * s;
-		p.head().xRot -= 0.45f * s;
-		p.body().yRot += side * 0.3f * s;
-		p.rightArm().zRot += 0.5f * s;
-		p.leftArm().zRot -= 0.5f * s;
-	}
-
-	private static void stagger(Parts p, float s) {
-		p.head().xRot -= 0.6f * s;
-		p.rightArm().zRot += 0.95f * s;
-		p.leftArm().zRot -= 0.95f * s;
-		p.rightArm().xRot = Mth.lerp(s, p.rightArm().xRot, -0.4f);
-		p.leftArm().xRot = Mth.lerp(s, p.leftArm().xRot, -0.4f);
-		p.rightLeg().xRot += 0.5f * s;
-		p.leftLeg().xRot -= 0.25f * s;
-	}
-
-	/** Curled up during a roll. */
-	private static void tuck(Parts p, float w) {
-		p.rightArm().xRot = Mth.lerp(w, p.rightArm().xRot, -2.2f);
-		p.leftArm().xRot = Mth.lerp(w, p.leftArm().xRot, -2.2f);
-		p.rightLeg().xRot = Mth.lerp(w, p.rightLeg().xRot, -1.4f);
-		p.leftLeg().xRot = Mth.lerp(w, p.leftLeg().xRot, -1.4f);
-		p.head().xRot = Mth.lerp(w, p.head().xRot, 0.6f);
-	}
-
-	/** Arms and legs thrown out while flying through the air. */
-	private static void flail(Parts p, float w) {
-		p.rightArm().xRot = Mth.lerp(w, p.rightArm().xRot, -2.8f);
-		p.leftArm().xRot = Mth.lerp(w, p.leftArm().xRot, -2.4f);
-		p.rightArm().zRot = Mth.lerp(w, p.rightArm().zRot, 0.6f);
-		p.leftArm().zRot = Mth.lerp(w, p.leftArm().zRot, -0.6f);
-		p.rightLeg().zRot = Mth.lerp(w, p.rightLeg().zRot, 0.4f);
-		p.leftLeg().zRot = Mth.lerp(w, p.leftLeg().zRot, -0.4f);
-	}
-
-	/** Dazed: arms hang limp and the head lolls. */
-	private static void dazed(Parts p, float t, float w) {
-		if (w <= 0) {
+		float low = GroundFit.lowest(pose, model);
+		if (Float.isNaN(low)) {
 			return;
 		}
-		p.rightArm().xRot = Mth.lerp(w, p.rightArm().xRot, 0.1f + 0.15f * Mth.sin(t * 0.3f));
-		p.leftArm().xRot = Mth.lerp(w, p.leftArm().xRot, 0.1f + 0.15f * Mth.sin(t * 0.3f + 1.0f));
-		p.rightArm().zRot = Mth.lerp(w, p.rightArm().zRot, 0.12f);
-		p.leftArm().zRot = Mth.lerp(w, p.leftArm().zRot, -0.12f);
-		p.head().xRot = Mth.lerp(w, p.head().xRot, 0.45f + 0.1f * Mth.sin(t * 0.25f));
-		p.head().yRot = Mth.lerp(w, p.head().yRot, 0.35f * Mth.sin(t * 0.18f));
-	}
-
-	/** Spread-eagle on the ground (w 0..1 blends from the normal pose). */
-	private static void sprawl(Parts p, float w) {
-		w = clamp01(w);
-		if (w <= 0) {
+		if (parts == null) {
+			// Other body shapes (spiders, creepers, things that hover): only keep them out of the floor.
+			GroundFit.lift(pose, Math.max(0f, -low));
 			return;
 		}
-		p.rightArm().xRot = Mth.lerp(w, p.rightArm().xRot, 0f);
-		p.leftArm().xRot = Mth.lerp(w, p.leftArm().xRot, 0f);
-		p.rightArm().zRot = Mth.lerp(w, p.rightArm().zRot, 1.2f);
-		p.leftArm().zRot = Mth.lerp(w, p.leftArm().zRot, -1.2f);
-		p.rightLeg().xRot = Mth.lerp(w, p.rightLeg().xRot, 0f);
-		p.leftLeg().xRot = Mth.lerp(w, p.leftLeg().xRot, 0f);
-		p.rightLeg().zRot = Mth.lerp(w, p.rightLeg().zRot, 0.18f);
-		p.leftLeg().zRot = Mth.lerp(w, p.leftLeg().zRot, -0.18f);
-		p.head().xRot = Mth.lerp(w, p.head().xRot, 0f);
+		float air = p[MobClips.AIR] * hipHeight(entity, model) / 0.75f;
+		float contact = (air - low) * w;          // lowest point exactly `air` above the floor
+		GroundFit.lift(pose, Math.max(contact, -low)); // and never below it while blending
+	}
+
+	/** The model is shared by every mob of its type: undo what the pose changed. */
+	public static void afterRender(LivingEntity entity, EntityModel<?> model) {
+		if (state(entity) == null) {
+			return;
+		}
+		Parts parts = parts(model);
+		if (parts != null) {
+			for (ModelPart part : parts.all()) {
+				part.resetPose();
+			}
+			if (parts.hat() != null) {
+				parts.hat().resetPose();
+			}
+		}
+	}
+
+	private static void set(ModelPart part, float[] p, int at, float w) {
+		part.xRot = turnTo(part.xRot, p[at], w);
+		part.yRot = turnTo(part.yRot, p[at + 1], w);
+		part.zRot = turnTo(part.zRot, p[at + 2], w);
+		// Offsets are from the part's own socket, so they suit any humanoid's proportions.
+		PartPose socket = part.getInitialPose();
+		part.x = Mth.lerp(w, part.x, socket.x + p[at + 3]);
+		part.y = Mth.lerp(w, part.y, socket.y + p[at + 4]);
+		part.z = Mth.lerp(w, part.z, socket.z + p[at + 5]);
+	}
+
+	private static float turnTo(float currentRad, float targetDeg, float w) {
+		float target = targetDeg * Mth.DEG_TO_RAD;
+		if (w >= 1f) {
+			return target;
+		}
+		return currentRad + Mth.wrapDegrees((target - currentRad) * Mth.RAD_TO_DEG) * Mth.DEG_TO_RAD * w;
+	}
+
+	/** Height of the hip joints above the feet in the entity's own (unscaled) space. */
+	private static float hipHeight(LivingEntity entity, EntityModel<?> model) {
+		Parts parts = parts(model);
+		if (parts != null) {
+			float hip = (24f - parts.rightLeg().getInitialPose().y) / 16f;
+			if (model.young) {
+				hip *= 0.5f;
+			}
+			if (hip > 0.1f) {
+				return hip;
+			}
+		}
+		return entity.getBbHeight() / Math.max(0.01f, entity.getScale()) * 0.45f;
 	}
 
 	@Nullable
@@ -456,50 +466,23 @@ public final class MobAnimator {
 		return null;
 	}
 
+	/** The model part of an arm, for what it holds (null if this model has no such part). */
+	@Nullable
+	public static ModelPart armPart(EntityModel<?> model, net.minecraft.world.entity.HumanoidArm arm) {
+		Parts parts = parts(model);
+		if (parts == null) {
+			return null;
+		}
+		return arm == net.minecraft.world.entity.HumanoidArm.RIGHT ? parts.rightArm() : parts.leftArm();
+	}
+
 	@Nullable
 	private static ModelPart child(ModelPart root, String name) {
 		return root.hasChild(name) ? root.getChild(name) : null;
 	}
 
-	/** +1 / -1: which way to twist away from the attacker. */
-	private static float side(LivingEntity entity, State s) {
-		Minecraft mc = Minecraft.getInstance();
-		Entity attacker = mc.level != null && s.attackerId() >= 0 ? mc.level.getEntity(s.attackerId()) : null;
-		if (attacker == null) {
-			return 1f;
-		}
-		float toAttacker = (float) Math.toDegrees(Math.atan2(-(attacker.getX() - entity.getX()), attacker.getZ() - entity.getZ()));
-		return Mth.wrapDegrees(toAttacker - entity.yBodyRot) > 0 ? -1f : 1f;
-	}
-
-	// ------------------------------------------------------------------ easing
-
-	private static float clamp01(float v) {
-		return Mth.clamp(v, 0f, 1f);
-	}
-
-	/** 0 -> 1 -> 0 over k in [0,1]. */
-	private static float bell(float k) {
-		return Mth.sin((float) Math.PI * clamp01(k));
-	}
-
-	private static float easeIn(float k) {
-		k = clamp01(k);
-		return k * k;
-	}
-
-	private static float easeOut(float k) {
-		k = clamp01(k);
-		return 1f - (1f - k) * (1f - k);
-	}
-
-	private static float easeInOut(float k) {
-		k = clamp01(k);
-		return k < 0.5f ? 2f * k * k : 1f - (float) Math.pow(-2f * k + 2f, 2) / 2f;
-	}
-
-	/** Blend weight that fades in over {@code fade} ticks and out over the last {@code fade}. */
-	private static float fadeInOut(float t, float d, float fade) {
-		return clamp01(Math.min(t / fade, (d - t) / fade));
+	private static float smooth(float k) {
+		k = Mth.clamp(k, 0f, 1f);
+		return k * k * (3f - 2f * k);
 	}
 }

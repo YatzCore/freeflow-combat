@@ -69,7 +69,7 @@ public class GroundTakedownMove implements Move {
 			ServerPlayNetworking.send(player, new MoveToPayload(spot.x, spot.z, travel, faceYaw));
 		}
 		EnemyStatus.event(player, CombatEventPayload.Type.TAKEDOWN_START, target, FreeflowConfig.groundTakedownTicks);
-		Anim.play(player, Anim.GROUND_TAKEDOWN);
+		Anim.play(player, Anim.GROUND_TAKEDOWN, FreeflowConfig.groundTakedownTicks);
 		return true;
 	}
 

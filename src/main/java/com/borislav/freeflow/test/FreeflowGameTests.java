@@ -854,9 +854,9 @@ public class FreeflowGameTests implements FabricGameTest {
 	/** Every animation the server can trigger must exist in the animation file and parse. */
 	@GameTest(template = EMPTY_STRUCTURE)
 	public void combatAnimationsParse(GameTestHelper h) {
-		// Hand-made animations (tools/gen_animations.py) + motion capture (tools/mocap.py).
+		// All written by tools/gen_animations.py.
 		java.util.Map<String, Integer> lengths = new java.util.HashMap<>();
-		for (String file : new String[] {"freeflow_combat.json", "freeflow_mocap.json"}) {
+		for (String file : new String[] {"freeflow_combat.json"}) {
 			String path = "/assets/freeflow/player_animations/" + file;
 			try (var in = FreeflowGameTests.class.getResourceAsStream(path)) {
 				h.assertTrue(in != null, "animation file missing: " + path);
@@ -866,6 +866,10 @@ public class FreeflowGameTests implements FabricGameTest {
 				animations.forEach(a -> {
 					h.assertTrue(!lengths.containsKey(a.getName()), "animation defined twice: " + a.getName());
 					lengths.put(a.getName(), a.getLength());
+					// Elbows and knees travel as extra bones; every clip must carry all four.
+					for (String joint : new String[] {"rightElbow", "leftElbow", "rightKnee", "leftKnee"}) {
+						h.assertTrue(a.getBodyParts().containsKey(joint), a.getName() + " has no " + joint + " bone");
+					}
 				});
 			} catch (java.io.IOException e) {
 				h.fail("could not read animations: " + e);
@@ -875,13 +879,16 @@ public class FreeflowGameTests implements FabricGameTest {
 			h.assertTrue(lengths.containsKey(name), "animation not found or failed to parse: " + name);
 			h.assertTrue(lengths.get(name) > 0, "animation has no length: " + name);
 		}
-		// Enemy motion-capture clips.
+		// Enemy clips (every one MobAnimator plays).
 		try (var in = FreeflowGameTests.class.getResourceAsStream("/assets/freeflow/mob_animations.json")) {
 			h.assertTrue(in != null, "mob_animations.json missing");
 			var mob = com.google.gson.JsonParser.parseReader(
 					new java.io.InputStreamReader(in, java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
-			for (String clip : new String[] {"fall_back", "get_up"}) {
+			for (String clip : new String[] {"windup", "windup_armed", "attack", "attack_armed", "hit_light_l", "hit_light_r",
+					"hit_medium", "launched", "stunned", "fall_back", "get_up", "ko_fall", "ko_ground", "countered_strike",
+					"countered_kick", "thrown", "blade_struck", "hooked", "pulled", "clotheslined"}) {
 				h.assertTrue(mob.has(clip) && mob.getAsJsonArray(clip).size() > 5, "mob clip missing: " + clip);
+				h.assertTrue(mob.getAsJsonArray(clip).get(0).getAsJsonArray().size() == 50, "mob clip rows must hold 50 values: " + clip);
 			}
 		} catch (java.io.IOException e) {
 			h.fail("could not read mob animations: " + e);

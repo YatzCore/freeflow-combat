@@ -29,7 +29,16 @@ public enum MobReaction {
 	/** Knocked out: falls flat and stays down (replaces the vanilla death tip-over). */
 	KNOCKED_OUT,
 	/** Countered. param = variant (0 block + punch, 1 parry + kick, 2 throw over the shoulder). */
-	COUNTERED;
+	COUNTERED,
+	// Gadget reactions, ready for the gadget system (new values go at the end: the number is sent).
+	/** Struck in the head by a thrown blade: staggers off, dazed for the rest of the time. */
+	GADGET_STRUCK,
+	/** The grapple claw has bitten: jolted, clutching the line, until pulled or released. */
+	HOOKED,
+	/** Yanked in on the line: torn off its feet toward the player, ends dazed in front of them. */
+	PULLED,
+	/** Clotheslined while coming in on the line: slammed onto its back, gets up at the end. */
+	CLOTHESLINED;
 
 	public static final int COUNTER_STRIKE = 0;
 	public static final int COUNTER_KICK = 1;
