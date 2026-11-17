@@ -9,5 +9,6 @@
 	"key.freeflow.toggle_mode": "Cycle Combat Mode",
 	"key.freeflow.debug_overlay": "Toggle Debug Overlay",
 	"key.freeflow.swap_shoulder": "Swap Camera Shoulder",
-	"key.freeflow.toggle_camera": "Toggle Combat Camera"
+	"key.freeflow.toggle_camera": "Toggle Combat Camera",
+	"key.freeflow.settings": "Open Freeflow Settings"
 }

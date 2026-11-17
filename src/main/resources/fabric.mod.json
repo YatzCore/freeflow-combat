@@ -11,6 +11,7 @@
 	"entrypoints": {
 		"main": ["com.borislav.freeflow.FreeflowMod"],
 		"client": ["com.borislav.freeflow.client.FreeflowClient"],
+		"modmenu": ["com.borislav.freeflow.client.config.ModMenuIntegration"],
 		"fabric-gametest": ["com.borislav.freeflow.test.FreeflowGameTests"]
 	},
 	"mixins": [

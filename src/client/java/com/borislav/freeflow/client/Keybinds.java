@@ -24,6 +24,7 @@ public final class Keybinds {
 	public static KeyMapping debugOverlay;
 	public static KeyMapping swapShoulder;
 	public static KeyMapping toggleCamera;
+	public static KeyMapping settings;
 
 	public static void register() {
 		counter = key("counter", GLFW.GLFW_KEY_R);
@@ -35,6 +36,7 @@ public final class Keybinds {
 		debugOverlay = key("debug_overlay", GLFW.GLFW_KEY_F7);
 		swapShoulder = key("swap_shoulder", GLFW.GLFW_KEY_H);
 		toggleCamera = key("toggle_camera", GLFW.GLFW_KEY_J);
+		settings = key("settings", GLFW.GLFW_KEY_K);
 	}
 
 	private static KeyMapping key(String name, int glfwKey) {

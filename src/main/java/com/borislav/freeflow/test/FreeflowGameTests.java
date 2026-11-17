@@ -10,6 +10,12 @@ import com.borislav.freeflow.combat.CombatMode;
 import com.borislav.freeflow.combat.CombatModeTracker;
 import com.borislav.freeflow.combat.CombatState;
 import com.borislav.freeflow.combat.CombatStateManager;
+import com.borislav.freeflow.config.ConfigStore;
+import com.borislav.freeflow.config.FreeflowConfig;
+import net.fabricmc.loader.api.FabricLoader;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
 import com.borislav.freeflow.network.CombatInputPayload;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.gametest.v1.FabricGameTest;
@@ -1083,6 +1089,73 @@ public class FreeflowGameTests implements FabricGameTest {
 		int acked = state.acceptedInputs;
 		CombatStateManager.handleInput(p, new CombatInputPayload(CombatAction.COUNTER, 0, 0, FACING_PLUS_Z));
 		h.assertTrue(state.acceptedInputs == acked, "counter spam during lockout should be ignored");
+		h.succeed();
+	}
+
+	// ------------------------------------------------------------------ settings (milestone 13)
+	// These change global settings, so each restores them before returning (tests share one server).
+
+	private static ConfigStore.Entry setting(String key) {
+		return ConfigStore.entries().stream().filter(e -> e.key().equals(key)).findFirst().orElseThrow();
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE)
+	public void settingsSaveLoadAndClamp(GameTestHelper h) throws Exception {
+		ConfigStore.Entry range = setting("strikeRange");
+		ConfigStore.Entry armed = setting("extraArmed");
+		Path tmp = Files.createTempFile("freeflow-test", ".json");
+		try {
+			ConfigStore.useFile(tmp);
+			ConfigStore.setLocal(range, 999.0);
+			ConfigStore.setLocal(armed, List.of(" minecraft:husk ", ""));
+			h.assertTrue((Double) ConfigStore.getLocal(range) == 24.0, "values are kept within the setting's limits");
+			ConfigStore.save();
+			ConfigStore.setLocal(range, range.defaultValue());
+			ConfigStore.setLocal(armed, armed.defaultValue());
+			ConfigStore.load();
+			h.assertTrue(FreeflowConfig.strikeRange == 24.0, "loading the file makes its values live");
+			h.assertTrue(FreeflowConfig.extraArmed.equals(List.of("minecraft:husk")), "lists are trimmed and saved");
+			h.assertTrue(ConfigStore.entries().size() > 100, "every tunable is a setting");
+		} finally {
+			ConfigStore.setLocal(range, range.defaultValue());
+			ConfigStore.setLocal(armed, armed.defaultValue());
+			ConfigStore.useFile(FabricLoader.getInstance().getConfigDir().resolve("freeflow.json"));
+			ConfigStore.applyLocal();
+			Files.deleteIfExists(tmp);
+		}
+		h.succeed();
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE)
+	public void serverSettingsLeaveClientSettingsAlone(GameTestHelper h) {
+		double range = FreeflowConfig.strikeRange;
+		double camera = FreeflowConfig.cameraDistance;
+		try {
+			String json = ConfigStore.gameplayJson();
+			h.assertTrue(json.contains("strikeRange") && !json.contains("cameraDistance"),
+					"only gameplay settings are sent to players");
+			ConfigStore.applyRemote("{\"strikeRange\": 5.0, \"cameraDistance\": 9.0}");
+			h.assertTrue(FreeflowConfig.strikeRange == 5.0, "the server's gameplay values apply");
+			h.assertTrue(FreeflowConfig.cameraDistance == camera, "a server never changes your camera");
+			ConfigStore.applyLocal();
+			h.assertTrue(FreeflowConfig.strikeRange == range, "leaving the server restores your own values");
+		} finally {
+			ConfigStore.applyLocal();
+		}
+		h.succeed();
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE)
+	public void settingsRoleListsAddMobs(GameTestHelper h) {
+		Zombie z = zombie(h, 2.5, 5.0);
+		List<String> before = FreeflowConfig.extraArmed;
+		try {
+			h.assertTrue(EnemyRole.of(z) == EnemyRole.NORMAL, "plain zombie is NORMAL");
+			FreeflowConfig.extraArmed = List.of("zombie");
+			h.assertTrue(EnemyRole.of(z) == EnemyRole.ARMED, "a zombie listed in Extra armed mobs is ARMED");
+		} finally {
+			FreeflowConfig.extraArmed = before;
+		}
 		h.succeed();
 	}
 }

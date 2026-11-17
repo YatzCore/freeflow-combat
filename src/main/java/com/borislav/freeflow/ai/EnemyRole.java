@@ -2,6 +2,7 @@ package com.borislav.freeflow.ai;
 
 import com.borislav.freeflow.FreeflowMod;
 import com.borislav.freeflow.config.FreeflowConfig;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.entity.EntityType;
@@ -13,6 +14,8 @@ import net.minecraft.world.item.CrossbowItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.SwordItem;
+
+import java.util.List;
 
 /**
  * How an enemy fights, which decides how the player has to deal with it.
@@ -42,22 +45,33 @@ public enum EnemyRole {
 
 	public static EnemyRole of(Mob mob) {
 		EntityType<?> type = mob.getType();
-		if (type.is(TAG_BOSS) || mob.getMaxHealth() > FreeflowConfig.bossHealthThreshold) {
+		String id = BuiltInRegistries.ENTITY_TYPE.getKey(type).toString();
+		if (type.is(TAG_BOSS) || listed(FreeflowConfig.extraBoss, id) || mob.getMaxHealth() > FreeflowConfig.bossHealthThreshold) {
 			return BOSS;
 		}
-		if (type.is(TAG_SHIELDED) || mob.getMainHandItem().is(Items.SHIELD) || mob.getOffhandItem().is(Items.SHIELD)) {
+		if (type.is(TAG_SHIELDED) || listed(FreeflowConfig.extraShielded, id) || mob.getMainHandItem().is(Items.SHIELD) || mob.getOffhandItem().is(Items.SHIELD)) {
 			return SHIELDED;
 		}
 		Item main = mob.getMainHandItem().getItem();
-		if (type.is(TAG_RANGED)
+		if (type.is(TAG_RANGED) || listed(FreeflowConfig.extraRanged, id)
 				|| (mob instanceof RangedAttackMob && (main instanceof BowItem || main instanceof CrossbowItem))) {
 			return RANGED;
 		}
-		if (type.is(TAG_ARMED)
+		if (type.is(TAG_ARMED) || listed(FreeflowConfig.extraArmed, id)
 				|| (FreeflowConfig.armedFromHeldWeapons && (main instanceof SwordItem || main instanceof AxeItem))) {
 			return ARMED;
 		}
 		return NORMAL;
+	}
+
+	/** Settings lists hold ids like "minecraft:vindicator"; a bare "vindicator" means minecraft too. */
+	private static boolean listed(List<String> ids, String id) {
+		for (String s : ids) {
+			if (s.equals(id) || ("minecraft:" + s).equals(id)) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/** Telegraph kind sent to the client (decides the warning colour). */

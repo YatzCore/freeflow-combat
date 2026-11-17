@@ -21,6 +21,9 @@ public final class ClientInputHandler {
 			return;
 		}
 
+		while (Keybinds.settings.consumeClick()) {
+			client.setScreen(com.borislav.freeflow.client.config.SettingsScreen.create(client.screen));
+		}
 		while (Keybinds.debugOverlay.consumeClick()) {
 			DebugOverlay.enabled = !DebugOverlay.enabled;
 		}

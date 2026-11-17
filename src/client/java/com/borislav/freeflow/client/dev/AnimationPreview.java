@@ -117,6 +117,19 @@ public final class AnimationPreview {
 	}
 
 	private static void buildScript(Minecraft mc) {
+		if ("1".equals(System.getenv("FREEFLOW_PREVIEW_SETTINGS"))) {
+			// Settings screen: one screenshot per tab, then quit.
+			for (com.borislav.freeflow.config.Setting.Category tab : com.borislav.freeflow.config.Setting.Category.values()) {
+				then(15, () -> {
+					mc.setScreen(com.borislav.freeflow.client.config.SettingsScreen.create(null, tab));
+					beginSheet("settings_" + tab.name().toLowerCase(java.util.Locale.ROOT));
+				});
+				then(1, () -> capture(mc));
+				then(1, () -> endSheet(mc));
+			}
+			then(5, () -> mc.stop());
+			return;
+		}
 		FreeflowMod.LOGGER.info("[preview] starting animation preview");
 		mc.options.hideGui = true;
 		mc.options.setCameraType(CameraType.THIRD_PERSON_BACK);

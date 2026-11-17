@@ -23,6 +23,9 @@ import com.borislav.freeflow.network.CombatSyncPayload;
 import com.borislav.freeflow.network.CounterPayload;
 import com.borislav.freeflow.network.EvadePayload;
 import com.borislav.freeflow.network.MoveToPayload;
+import com.borislav.freeflow.network.ConfigSyncPayload;
+import com.borislav.freeflow.config.ConfigStore;
+import net.minecraft.client.Minecraft;
 import com.borislav.freeflow.network.StrikeStartPayload;
 import com.borislav.freeflow.network.TelegraphPayload;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
@@ -44,6 +47,12 @@ public class FreeflowClient implements ClientModInitializer {
 		CombatAnimations.init();
 		ClientPlayNetworking.registerGlobalReceiver(MobReactionPayload.TYPE,
 				(payload, context) -> MobAnimator.onReaction(payload));
+		// A server's gameplay settings apply while playing there (in your own world the fields are shared already).
+		ClientPlayNetworking.registerGlobalReceiver(ConfigSyncPayload.TYPE, (payload, context) -> {
+			if (!Minecraft.getInstance().hasSingleplayerServer()) {
+				ConfigStore.applyRemote(payload.json());
+			}
+		});
 		ClientPlayNetworking.registerGlobalReceiver(AnimationPayload.TYPE,
 				(payload, context) -> CombatAnimations.onAnimation(payload));
 		ClientTickEvents.START_CLIENT_TICK.register(client -> {
@@ -101,6 +110,7 @@ public class FreeflowClient implements ClientModInitializer {
 		WorldRenderEvents.AFTER_ENTITIES.register(StatusMarkers::render);
 		WorldRenderEvents.AFTER_ENTITIES.register(TargetIndicator::render);
 		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
+			ConfigStore.applyLocal(); // back to your own settings after a server
 			CinematicShots.reset();
 			Impact.reset();
 			MobAnimator.reset();
