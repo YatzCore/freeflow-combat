@@ -1350,10 +1350,72 @@ public class FreeflowGameTests implements FabricGameTest {
 	}
 
 	@GameTest(template = EMPTY_STRUCTURE)
+	public void infiniteWavesKeepGrowing(GameTestHelper h) {
+		net.minecraft.util.RandomSource random = net.minecraft.util.RandomSource.create(42);
+		int last = 0;
+		for (int n = 1; n <= 40; n++) {
+			com.borislav.freeflow.arena.Waves.Wave w = com.borislav.freeflow.arena.Waves.infinite(n, random);
+			int size = w.enemies().size();
+			h.assertTrue(size >= last && size <= com.borislav.freeflow.arena.Waves.INFINITE_MAX_ENEMIES,
+					"wave " + n + " is never smaller than the last and never over the cap (" + size + ")");
+			last = size;
+			long thugs = w.enemies().stream().filter(e -> e.type() == EntityType.HUSK
+					&& e.gear() == com.borislav.freeflow.arena.Waves.Gear.NONE).count();
+			h.assertTrue(thugs >= 3, "wave " + n + " always has plain thugs to counter (" + thugs + ")");
+			long shooters = w.enemies().stream().filter(com.borislav.freeflow.arena.Waves::isShooter).count();
+			h.assertTrue(shooters <= 3, "wave " + n + " has at most 3 shooters (" + shooters + ")");
+			boolean ravager = w.enemies().stream().anyMatch(e -> e.type() == EntityType.RAVAGER);
+			if (n % 5 == 0) {
+				h.assertTrue(ravager, "every 5th wave is a boss wave");
+			}
+			if (n < 5) {
+				h.assertTrue(!ravager, "no boss before wave 5");
+			}
+		}
+		h.assertTrue(com.borislav.freeflow.arena.Waves.infinite(1, random).enemies().stream()
+				.allMatch(e -> e.type() == EntityType.HUSK && e.gear() == com.borislav.freeflow.arena.Waves.Gear.NONE),
+				"wave 1 is only thugs");
+		h.assertTrue(com.borislav.freeflow.arena.Waves.infinite(10, random).healthScale() == 1.0
+				&& com.borislav.freeflow.arena.Waves.infinite(20, random).healthScale() > 1.9,
+				"enemies only get tougher after wave 10");
+		h.succeed();
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE)
+	public void arenaRecordsKeepTheBest(GameTestHelper h) {
+		com.borislav.freeflow.arena.ArenaRecords r = new com.borislav.freeflow.arena.ArenaRecords();
+		java.util.UUID id = java.util.UUID.randomUUID();
+		h.assertTrue(r.submitInfinite(id, "a", 3, 20), "the first run is a record");
+		h.assertTrue(!r.submitInfinite(id, "a", 2, 99), "fewer waves is not");
+		h.assertTrue(r.submitInfinite(id, "a", 3, 25), "same waves with more knock-outs is");
+		h.assertTrue(r.of(id).infiniteWaves == 3 && r.of(id).infiniteKos == 25, "the best run is kept");
+		h.assertTrue(!r.submitInfinite(java.util.UUID.randomUUID(), "b", 0, 0), "clearing no waves is never a record");
+		h.assertTrue(r.submitClassic(id, "a", 120) && !r.submitClassic(id, "a", 130) && r.submitClassic(id, "a", 100),
+				"classic keeps the fastest time");
+		h.assertTrue(r.topInfinite(5).size() == 1 && r.topInfinite(5).get(0).name.equals("a"), "the leaderboard lists runs");
+		h.succeed();
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE)
+	public void infiniteArenaStartsAndStops(GameTestHelper h) {
+		ServerPlayer p = player(h, CombatMode.AUTO);
+		try {
+			h.assertTrue(Arena.start(p, Arena.Mode.INFINITE, true) == null, "infinite mode starts");
+			h.assertTrue(Arena.modeOf(p) == Arena.Mode.INFINITE, "in infinite mode");
+			BlockPos c = Arena.centerOf(p);
+			h.assertTrue(Arena.stop(p), "stop ends it");
+			h.assertTrue(c != null && h.getLevel().getBlockState(c).isAir(), "and removes the arena");
+		} finally {
+			Arena.stop(p);
+		}
+		h.succeed();
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE)
 	public void arenaRefusesPeaceful(GameTestHelper h) {
 		ServerPlayer p = player(h, CombatMode.AUTO);
 		if (h.getLevel().getDifficulty() == net.minecraft.world.Difficulty.PEACEFUL) {
-			h.assertTrue(Arena.start(p) != null && !Arena.isActive(p), "no arena on Peaceful (enemies would vanish)");
+			h.assertTrue(Arena.start(p, Arena.Mode.CLASSIC) != null && !Arena.isActive(p), "no arena on Peaceful (enemies would vanish)");
 		}
 		Arena.stop(p);
 		h.succeed();

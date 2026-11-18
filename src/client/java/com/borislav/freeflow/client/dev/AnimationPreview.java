@@ -429,7 +429,8 @@ public final class AnimationPreview {
 		then(5, () -> command(mc, "gamemode survival @p"));
 		then(5, () -> command(mc, "effect give @p minecraft:resistance 120 4 true"));
 		then(30, () -> {
-			command(mc, "freeflow arena start");
+			command(mc, "infinite".equals(System.getenv("FREEFLOW_PREVIEW_ARENA_MODE"))
+					? "freeflow arena start infinite" : "freeflow arena start");
 		});
 		then(20, () -> {
 			center[0] = mc.player.position();
@@ -466,6 +467,11 @@ public final class AnimationPreview {
 							mc.player.getHealth(), mc.level.getEntitiesOfClass(net.minecraft.world.entity.monster.Monster.class,
 									mc.player.getBoundingBox().inflate(16)).size());
 				}
+				if (tick == 300) {
+					beginSheet("arena_hud");
+					capture(mc);
+					endSheet(mc);
+				}
 				if (tick == 600) {
 					lookAt(center[0].add(-9, 7, 9), center[0]);
 					beginSheet("arena_later");
@@ -476,6 +482,7 @@ public final class AnimationPreview {
 			});
 		}
 		then(5, () -> command(mc, "freeflow arena stop"));
+		then(5, () -> remote(mc, "freeflow arena records"));
 		then(20, () -> FreeflowMod.LOGGER.info("[preview] arena stopped, player back at {}, inventory: {}",
 				mc.player.position(), inventory(mc)));
 		then(10, () -> mc.stop());

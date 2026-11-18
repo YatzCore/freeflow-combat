@@ -10,6 +10,7 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.game.ClientboundSetActionBarTextPacket;
 import net.minecraft.network.protocol.game.ClientboundSetSubtitleTextPacket;
 import net.minecraft.network.protocol.game.ClientboundSetTitleTextPacket;
 import net.minecraft.network.protocol.game.ClientboundSetTitlesAnimationPacket;
@@ -26,6 +27,9 @@ import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.ExperienceOrb;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobSpawnType;
+import net.minecraft.world.entity.ai.attributes.AttributeInstance;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.monster.Zombie;
 import net.minecraft.world.level.Level;
@@ -64,11 +68,30 @@ public final class Arena {
 	private static final int SPAWN_GAP_TICKS = 6;
 	private static final int END_TICKS = 100;
 
+	/** Heal between waves (half a heart = 1). */
+	private static final float HEAL_BETWEEN_WAVES = 6.0f;
+	/** After this long in a wave, the last few enemies glow so you can find them. */
+	private static final int GLOW_AFTER_TICKS = 200;
+	private static final int GLOW_WHEN_LEFT = 2;
+
+	private static final net.minecraft.resources.ResourceLocation TOUGHER =
+			net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("freeflow", "arena_tougher");
+
+	public static final String ARENA_TAG = "freeflow_arena";
+
 	private static final Map<UUID, Arena> ACTIVE = new HashMap<>();
+
+	public enum Mode {
+		/** The four set waves. */
+		CLASSIC,
+		/** Endless waves that keep growing until you're knocked out. */
+		INFINITE
+	}
 
 	private enum Phase { COUNTDOWN, SPAWNING, FIGHTING, ENDING }
 
 	private final UUID owner;
+	private final Mode mode;
 	private final ServerLevel level;
 	private final BlockPos center;
 	private final ResourceKey<Level> returnDimension;
@@ -83,9 +106,16 @@ public final class Arena {
 	private int timer = COUNTDOWN_TICKS;
 	private int spawned = 0;
 	private long startTick;
+	/** The wave being fought (infinite waves are rolled when their countdown starts). */
+	private Waves.Wave current;
+	private int phaseTicks = 0;
+	private int knockouts = 0;
+	private int maxCombo = 0;
+	private boolean newRecord = false;
 
-	private Arena(ServerPlayer player, BlockPos center) {
+	private Arena(ServerPlayer player, BlockPos center, Mode mode) {
 		this.owner = player.getUUID();
+		this.mode = mode;
 		this.level = player.serverLevel();
 		this.center = center;
 		this.returnDimension = player.level().dimension();
@@ -112,6 +142,16 @@ public final class Arena {
 			}
 			return true;
 		});
+		// Arena enemies that die (not removed) are knock-outs for the run's result.
+		ServerLivingEntityEvents.AFTER_DEATH.register((entity, source) -> {
+			if (entity instanceof Mob && entity.getTags().contains(ARENA_TAG)) {
+				for (Arena arena : ACTIVE.values()) {
+					if (arena.enemies.contains(entity.getUUID())) {
+						arena.knockouts++;
+					}
+				}
+			}
+		});
 		ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
 			Arena arena = ACTIVE.get(handler.getPlayer().getUUID());
 			if (arena != null) {
@@ -128,13 +168,18 @@ public final class Arena {
 
 	/** Builds the arena above the player and starts wave 1. Returns an error message, or null. */
 	@Nullable
-	public static Component start(ServerPlayer player) {
-		return start(player, false);
+	public static Component start(ServerPlayer player, Mode mode) {
+		return start(player, mode, false);
 	}
 
 	/** Test hook: {@code anyDifficulty} skips the Peaceful check (the GameTest world is Peaceful). */
 	@Nullable
 	public static Component start(ServerPlayer player, boolean anyDifficulty) {
+		return start(player, Mode.CLASSIC, anyDifficulty);
+	}
+
+	@Nullable
+	public static Component start(ServerPlayer player, Mode mode, boolean anyDifficulty) {
 		if (ACTIVE.containsKey(player.getUUID())) {
 			return Component.literal("You're already in an arena: /freeflow arena stop ends it.");
 		}
@@ -155,7 +200,7 @@ public final class Arena {
 		if (center == null) {
 			return Component.literal("No empty sky above you to build the arena in; move a little and try again.");
 		}
-		Arena arena = new Arena(player, center);
+		Arena arena = new Arena(player, center, mode);
 		arena.build();
 		ACTIVE.put(player.getUUID(), arena);
 		arena.startTick = level.getGameTime();
@@ -163,9 +208,16 @@ public final class Arena {
 		player.fallDistance = 0;
 		CombatState state = CombatStateManager.get(player);
 		state.combo = 0;
-		title(player, Component.literal("Combat Challenge").withStyle(ChatFormatting.GOLD),
-				Component.literal(Waves.ALL.size() + " waves. Empty hand, fists only."));
-		FreeflowMod.LOGGER.info("{} started a combat challenge at {}", player.getName().getString(), center);
+		if (mode == Mode.INFINITE) {
+			ArenaRecords.Entry best = ArenaRecords.get(level.getServer()).of(player.getUUID());
+			title(player, Component.literal("Infinite Challenge").withStyle(ChatFormatting.GOLD),
+					Component.literal(best.infiniteWaves > 0 ? "Your best: " + best.infiniteWaves + " waves" : "How long can you last?"));
+		} else {
+			title(player, Component.literal("Combat Challenge").withStyle(ChatFormatting.GOLD),
+					Component.literal(Waves.ALL.size() + " waves. Empty hand, fists only."));
+		}
+		FreeflowMod.LOGGER.info("{} started the {} combat challenge at {}", player.getName().getString(),
+				mode.name().toLowerCase(java.util.Locale.ROOT), center);
 		return null;
 	}
 
@@ -174,6 +226,9 @@ public final class Arena {
 		Arena arena = ACTIVE.get(player.getUUID());
 		if (arena == null) {
 			return false;
+		}
+		if (arena.mode == Mode.INFINITE && arena.phase != Phase.ENDING) {
+			arena.recordInfinite(player); // the waves you cleared still count
 		}
 		arena.close(player);
 		return true;
@@ -269,16 +324,20 @@ public final class Arena {
 			close(player); // left the arena (teleported, changed dimension)
 			return;
 		}
+		maxCombo = Math.max(maxCombo, CombatStateManager.get(player).combo);
+		phaseTicks++;
 		switch (phase) {
 			case COUNTDOWN -> {
 				if (timer == COUNTDOWN_TICKS) {
-					Waves.Wave w = Waves.ALL.get(wave);
-					title(player, Component.literal("Wave " + (wave + 1) + " / " + Waves.ALL.size()).withStyle(ChatFormatting.GOLD),
-							Component.literal(w.name()));
+					current = mode == Mode.INFINITE ? Waves.infinite(wave + 1, level.getRandom()) : Waves.ALL.get(wave);
+					boolean boss = mode == Mode.INFINITE && (wave + 1) % 5 == 0;
+					String label = mode == Mode.INFINITE ? "Wave " + (wave + 1) : "Wave " + (wave + 1) + " / " + Waves.ALL.size();
+					title(player, Component.literal(label).withStyle(boss ? ChatFormatting.RED : ChatFormatting.GOLD),
+							Component.literal(current.name()));
 				}
 				if (--timer <= 0) {
 					toSpawn.clear();
-					toSpawn.addAll(Waves.ALL.get(wave).enemies());
+					toSpawn.addAll(current.enemies());
 					spawned = 0;
 					phase = Phase.SPAWNING;
 					timer = 0;
@@ -286,6 +345,9 @@ public final class Arena {
 				}
 			}
 			case SPAWNING -> {
+				if (player.tickCount % 10 == 0) {
+					status(player, aliveEnemies() + toSpawn.size());
+				}
 				if (--timer <= 0) {
 					Waves.Enemy next = toSpawn.poll();
 					if (next != null) {
@@ -294,18 +356,30 @@ public final class Arena {
 					timer = SPAWN_GAP_TICKS;
 					if (toSpawn.isEmpty()) {
 						phase = Phase.FIGHTING;
+						phaseTicks = 0;
 					}
 				}
 			}
 			case FIGHTING -> {
-				if (player.tickCount % 10 == 0 && aliveEnemies() == 0) {
+				if (player.tickCount % 10 != 0) {
+					break;
+				}
+				int alive = aliveEnemies();
+				if (alive == 0) {
 					sweepDrops();
 					wave++;
-					if (wave >= Waves.ALL.size()) {
+					if (mode == Mode.CLASSIC && wave >= Waves.ALL.size()) {
 						finish(player, true);
 					} else {
+						player.heal(HEAL_BETWEEN_WAVES);
+						level.playSound(null, player.blockPosition(), SoundEvents.PLAYER_LEVELUP, SoundSource.PLAYERS, 0.6f, 1.4f);
 						phase = Phase.COUNTDOWN;
 						timer = COUNTDOWN_TICKS;
+					}
+				} else {
+					status(player, alive);
+					if (phaseTicks > GLOW_AFTER_TICKS && alive <= GLOW_WHEN_LEFT) {
+						glowStragglers();
 					}
 				}
 			}
@@ -318,7 +392,7 @@ public final class Arena {
 	}
 
 	private void spawn(ServerPlayer player, Waves.Enemy enemy, int index) {
-		int total = Waves.ALL.get(wave).enemies().size();
+		int total = current.enemies().size();
 		double angle = Math.PI * 2 * index / total + wave * 0.6;
 		Vec3 at = new Vec3(center.getX() + 0.5 + Math.cos(angle) * SPAWN_RADIUS, center.getY() + 1,
 				center.getZ() + 0.5 + Math.sin(angle) * SPAWN_RADIUS);
@@ -333,6 +407,14 @@ public final class Arena {
 			zombie.setBaby(false);
 		}
 		Waves.equip(mob, enemy.gear());
+		if (current.healthScale() > 1.0) {
+			AttributeInstance health = mob.getAttribute(Attributes.MAX_HEALTH);
+			if (health != null) {
+				health.addPermanentModifier(new AttributeModifier(TOUGHER, current.healthScale() - 1.0,
+						AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL));
+				mob.setHealth(mob.getMaxHealth());
+			}
+		}
 		for (EquipmentSlot slot : EquipmentSlot.values()) {
 			mob.setDropChance(slot, 0.0f);
 		}
@@ -342,7 +424,7 @@ public final class Arena {
 		data.putString("DeathLootTable", "minecraft:empty");
 		mob.readAdditionalSaveData(data);
 		mob.setPersistenceRequired();
-		mob.addTag("freeflow_arena");
+		mob.addTag(ARENA_TAG);
 		level.addFreshEntityWithPassengers(mob);
 		if (mob.getVehicle() != null) {
 			mob.getVehicle().discard(); // no chicken jockeys in a training room
@@ -373,6 +455,36 @@ public final class Arena {
 		return wave;
 	}
 
+	/** Action bar during a wave: which wave, how many enemies are left. */
+	private void status(ServerPlayer player, int alive) {
+		String w = mode == Mode.INFINITE ? "Wave " + (wave + 1) : "Wave " + (wave + 1) + "/" + Waves.ALL.size();
+		player.connection.send(new ClientboundSetActionBarTextPacket(
+				Component.literal(w + "  ·  " + alive + " left").withStyle(ChatFormatting.GRAY)));
+	}
+
+	private void glowStragglers() {
+		for (UUID id : enemies) {
+			Entity e = level.getEntity(id);
+			if (e != null && e.isAlive() && !e.hasGlowingTag()) {
+				e.setGlowingTag(true);
+			}
+		}
+	}
+
+	/** Mode of the player's arena, or null (tests). */
+	@Nullable
+	public static Mode modeOf(ServerPlayer player) {
+		Arena a = ACTIVE.get(player.getUUID());
+		return a == null ? null : a.mode;
+	}
+
+	/** Test hook: the wave currently being fought or counted down to. */
+	@Nullable
+	public static Waves.Wave currentWaveOf(ServerPlayer player) {
+		Arena a = ACTIVE.get(player.getUUID());
+		return a == null ? null : a.current;
+	}
+
 	/** Centre of the player's arena floor, or null (tests). */
 	@Nullable
 	public static BlockPos centerOf(ServerPlayer player) {
@@ -386,21 +498,44 @@ public final class Arena {
 		if (phase == Phase.ENDING) {
 			return;
 		}
+		if (mode == Mode.INFINITE) {
+			recordInfinite(player);
+		}
 		phase = Phase.ENDING;
 		timer = END_TICKS;
 		removeEnemies();
 		int seconds = (int) ((level.getGameTime() - startTick) / 20);
-		String time = String.format("%d:%02d", seconds / 60, seconds % 60);
+		String time = ArenaRecords.time(seconds);
+		String stats = knockouts + " knock-outs, best combo " + maxCombo + ", " + time;
+		if (mode == Mode.INFINITE) {
+			FreeflowMod.LOGGER.info("{}'s infinite challenge: cleared {} waves, {}", player.getName().getString(), wave, stats);
+			title(player, Component.literal(wave + (wave == 1 ? " wave cleared" : " waves cleared")).withStyle(ChatFormatting.GOLD),
+					Component.literal(newRecord ? "New record!" : stats));
+			player.sendSystemMessage(Component.literal("Infinite challenge: " + wave + " waves cleared (" + stats + ")"
+					+ (newRecord ? ". New record!" : "")).withStyle(ChatFormatting.GOLD));
+			if (newRecord) {
+				level.playSound(null, player.blockPosition(), SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, SoundSource.PLAYERS, 1.0f, 1.0f);
+			}
+			return;
+		}
 		FreeflowMod.LOGGER.info("{}'s combat challenge: {} at wave {} after {}", player.getName().getString(),
 				victory ? "won" : "defeated", Math.min(wave + 1, Waves.ALL.size()), time);
 		if (victory) {
+			newRecord = ArenaRecords.get(level.getServer()).submitClassic(player.getUUID(), player.getName().getString(), seconds);
 			title(player, Component.literal("Challenge complete").withStyle(ChatFormatting.GOLD),
-					Component.literal("All " + Waves.ALL.size() + " waves in " + time));
+					Component.literal(newRecord ? "New best time: " + time : "All " + Waves.ALL.size() + " waves in " + time));
+			player.sendSystemMessage(Component.literal("Combat challenge complete (" + stats + ")"
+					+ (newRecord ? ". New best time!" : "")).withStyle(ChatFormatting.GOLD));
 			level.playSound(null, player.blockPosition(), SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, SoundSource.PLAYERS, 1.0f, 1.0f);
 		} else {
 			title(player, Component.literal("Defeated").withStyle(ChatFormatting.RED),
 					Component.literal("Reached wave " + (wave + 1) + " of " + Waves.ALL.size() + " (" + time + ")"));
 		}
+	}
+
+	/** Saves the infinite run's result: the waves fully cleared. */
+	private void recordInfinite(ServerPlayer player) {
+		newRecord = ArenaRecords.get(level.getServer()).submitInfinite(player.getUUID(), player.getName().getString(), wave, knockouts);
 	}
 
 	/** Sends the player back and removes everything the challenge put in the world. */

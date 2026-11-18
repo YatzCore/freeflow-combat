@@ -52,6 +52,15 @@ knocked out ends the run instead of killing you, and when it ends you go back to
 started and the arena is removed. `/freeflow arena stop` ends it early. Available to operators
 and singleplayer owners (a server setting can open it to everyone).
 
+`/freeflow arena infinite` is the endless version: one more enemy every wave (up to 14), new
+kinds of enemies join as you go, every 5th wave is a boss wave with ravagers, and after wave 10
+enemies get tougher. It runs until you're knocked out or stop it.
+
+In both modes you heal a little between waves, the action bar shows the wave and how many
+enemies are left, and the last stragglers start glowing if a wave drags on.
+`/freeflow arena records` shows your best classic time, your most infinite waves, and the
+world's top infinite runs.
+
 ## Settings
 
 Press **K** (or use Mod Menu). Every timing, range, damage value, enemy role list, camera
