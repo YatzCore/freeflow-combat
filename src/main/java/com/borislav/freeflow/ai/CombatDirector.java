@@ -116,7 +116,16 @@ public final class CombatDirector {
 		return false;
 	}
 
-	/** True if the mob should hold back (no turn) instead of closing in. */
+	/** Ticks an enemy given the go-ahead has to reach you and start its attack. */
+	static final int APPROACH_TICKS = 60;
+	/** Min ticks between two enemies being sent in, so they peel off the ring one by one. */
+	static final int APPROACH_GAP_TICKS = 8;
+
+	/**
+	 * True if the mob should hold back on the ring instead of closing in. Like the Arkham
+	 * thugs, enemies stand off in a loose ring and only a few at a time (up to the attacker
+	 * cap, counting those already attacking) are sent in to attack; everyone else waits.
+	 */
 	public static boolean shouldWait(ServerPlayer player, Mob mob) {
 		if (!isDirected(player)) {
 			return false;
@@ -124,29 +133,94 @@ public final class CombatDirector {
 		CombatState state = CombatStateManager.get(player);
 		long now = player.level().getGameTime();
 		EnemySlot slot = slot(state, mob);
-		if (slot.isTelegraphing()) {
+		if (slot.isTelegraphing() || slot.isApproaching(now)) {
 			return false; // its turn: let it close in
 		}
-		boolean hasTurnAvailable = !slot.isStunned(now) && now >= slot.nextAllowed
-				&& active(state, false) < FreeflowConfig.maxSimultaneousAttackers;
-		return !hasTurnAvailable && mob.distanceTo(player) < FreeflowConfig.circleRadius + 1.0;
+		if (slot.isStunned(now) || now < slot.nextAllowed || attackingSomeoneElse(player, mob)) {
+			return true;
+		}
+		if (now - state.lastApproachGrant < APPROACH_GAP_TICKS
+				|| active(state, false) + approaching(state, now) >= FreeflowConfig.maxSimultaneousAttackers) {
+			return true;
+		}
+		slot.approachUntil = now + APPROACH_TICKS;
+		state.lastApproachGrant = now;
+		return false;
 	}
 
-	/** Keeps a waiting mob on a ring around the player, drifting sideways. */
+	private static int approaching(CombatState state, long now) {
+		int n = 0;
+		for (EnemySlot s : state.enemies.values()) {
+			if (s.isApproaching(now)) {
+				n++;
+			}
+		}
+		return n;
+	}
+
+	/**
+	 * A waiting enemy in its fighting stance: facing you at the stand-off distance, side-stepping
+	 * around you with pauses, backing off if too close, and keeping its distance from the others.
+	 */
 	public static void circle(ServerPlayer player, Mob mob) {
 		CombatState state = CombatStateManager.get(player);
 		long now = player.level().getGameTime();
 		EnemySlot slot = slot(state, mob);
 		mob.getLookControl().setLookAt(player, 30.0f, 30.0f);
-		if (now - slot.lastReposition < 10) {
+		if (slot.isStunned(now)) {
+			mob.getNavigation().stop();
 			return;
 		}
-		slot.lastReposition = now;
-		double angle = Math.atan2(mob.getZ() - player.getZ(), mob.getX() - player.getX());
-		angle += (mob.getId() % 2 == 0 ? 1 : -1) * Math.toRadians(25);
-		double r = FreeflowConfig.circleRadius;
-		mob.getNavigation().moveTo(player.getX() + Math.cos(angle) * r, player.getY(),
-				player.getZ() + Math.sin(angle) * r, 0.9);
+		double dx = mob.getX() - player.getX();
+		double dz = mob.getZ() - player.getZ();
+		double dist = Math.sqrt(dx * dx + dz * dz);
+		// Each enemy has its own ring a little in or out, so the circle looks loose, not drilled.
+		double ring = FreeflowConfig.standoffDistance + (Math.floorMod(mob.getId(), 3) - 1) * 0.6;
+		if (dist > ring + 3.0 || Math.abs(mob.getY() - player.getY()) > 2.0) {
+			// Far away (or on another level): walk over to the ring first.
+			if (now - slot.lastReposition >= 10) {
+				slot.lastReposition = now;
+				double angle = Math.atan2(dz, dx);
+				mob.getNavigation().moveTo(player.getX() + Math.cos(angle) * ring, player.getY(),
+						player.getZ() + Math.sin(angle) * ring, 1.0);
+			}
+			return;
+		}
+		mob.getNavigation().stop();
+		// Face the player and strafe relative to that facing (the way skeletons circle).
+		mob.lookAt(player, 30.0f, 30.0f);
+		float forward = dist < ring - 0.8 ? -0.5f : dist > ring + 0.8 ? 0.5f : 0.0f;
+		// Side-step one way for a while, pause in stance, then switch direction.
+		long phase = (now + mob.getId() * 37L) % 120;
+		float side = phase < 30 ? 0.0f : ((now + mob.getId() * 37L) / 120 + mob.getId()) % 2 == 0 ? 0.35f : -0.35f;
+		// Keep away from the other waiting enemies: step away from the nearest one too close.
+		double yaw = Math.toRadians(mob.getYRot());
+		double rightX = -Math.cos(yaw), rightZ = -Math.sin(yaw); // the mob's right-hand side
+		double fwdX = -Math.sin(yaw), fwdZ = Math.cos(yaw);
+		double spacing = FreeflowConfig.enemySpacing;
+		Mob nearest = null;
+		double nearestD = spacing;
+		for (EnemySlot other : state.enemies.values()) {
+			Mob o = other.mob;
+			if (o == mob || !o.isAlive()) {
+				continue;
+			}
+			double d = o.distanceTo(mob);
+			if (d < nearestD) {
+				nearestD = d;
+				nearest = o;
+			}
+		}
+		if (nearest != null) {
+			double ox = nearest.getX() - mob.getX(), oz = nearest.getZ() - mob.getZ();
+			double push = 0.55 * (1.0 - nearestD / spacing) + 0.25;
+			// strafe()'s second argument moves the mob to its LEFT when positive (it becomes xxa).
+			side = (float) (ox * rightX + oz * rightZ > 0 ? push : -push);
+			if (ox * fwdX + oz * fwdZ > 0 && forward >= 0) {
+				forward = -0.3f; // someone's in front: step back out of the way
+			}
+		}
+		mob.getMoveControl().strafe(forward, side);
 	}
 
 	/** Resolves due attacks and forgets dead/invalid enemies. */
@@ -182,6 +256,7 @@ public final class CombatDirector {
 				} else {
 					slot.nextAllowed = now + Mth.nextInt(mob.getRandom(),
 							FreeflowConfig.enemyAttackCooldownMin, FreeflowConfig.enemyAttackCooldownMax);
+					slot.approachUntil = -1; // done: back to the ring
 					strike(player, mob);
 				}
 			}

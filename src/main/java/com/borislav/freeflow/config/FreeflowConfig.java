@@ -128,9 +128,12 @@ public final class FreeflowConfig {
 	public static int enemyAttackCooldownMin = 25;
 	@Setting(category = ENEMIES, name = "Enemy cooldown (max)", min = 0, max = 400)
 	public static int enemyAttackCooldownMax = 50;
-	@Setting(category = ENEMIES, name = "Circling distance", min = 1.5, max = 12,
-			tip = "How far waiting enemies keep while circling you.")
-	public static double circleRadius = 3.5;
+	@Setting(category = ENEMIES, name = "Stand-off distance", min = 2.5, max = 12,
+			tip = "How far enemies waiting for their turn stand from you, in a fighting stance.")
+	public static double standoffDistance = 5.5;
+	@Setting(category = ENEMIES, name = "Enemy spacing", min = 0.5, max = 6,
+			tip = "How much room waiting enemies keep between each other.")
+	public static double enemySpacing = 2.2;
 
 	// --- Counter ---
 

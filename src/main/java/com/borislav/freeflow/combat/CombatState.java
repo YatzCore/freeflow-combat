@@ -53,6 +53,8 @@ public class CombatState {
 	/** Enemies fighting this player, by entity id. */
 	public final Map<Integer, EnemySlot> enemies = new HashMap<>();
 	public long lastTelegraphTick = -100;
+	/** Last time the director sent an enemy in off the ring. */
+	public long lastApproachGrant = -100;
 	public long counterCooldownUntil = 0;
 	/** Rotates counter variants (strike, kick, throw). */
 	public int counterIndex = 0;

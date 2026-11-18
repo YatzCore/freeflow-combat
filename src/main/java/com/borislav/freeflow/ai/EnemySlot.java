@@ -19,6 +19,12 @@ public class EnemySlot {
 	public final MobStatus status;
 	/** Last time a circling move was issued (throttle). */
 	public long lastReposition = -100;
+	/** Until this tick the enemy may leave the ring and close in to attack; -1 = waiting. */
+	public long approachUntil = -1;
+
+	public boolean isApproaching(long now) {
+		return now < approachUntil && !isTelegraphing();
+	}
 
 	public EnemySlot(Mob mob) {
 		this.mob = mob;

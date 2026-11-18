@@ -467,6 +467,14 @@ public final class AnimationPreview {
 							mc.player.getHealth(), mc.level.getEntitiesOfClass(net.minecraft.world.entity.monster.Monster.class,
 									mc.player.getBoundingBox().inflate(16)).size());
 				}
+				if (tick % 100 == 52) {
+					var mobs = mc.level.getEntitiesOfClass(net.minecraft.world.entity.monster.Monster.class,
+							mc.player.getBoundingBox().inflate(16));
+					double minGap = 99;
+					for (var m1 : mobs) for (var m2 : mobs) if (m1 != m2) minGap = Math.min(minGap, m1.distanceTo(m2));
+					FreeflowMod.LOGGER.info("[preview] arena spread t={} dists={} closestPair={}", tick, mobs.stream()
+							.map(m -> String.format("%.1f", m.distanceTo(mc.player))).sorted().toList(), String.format("%.1f", minGap));
+				}
 				if (tick == 300) {
 					beginSheet("arena_hud");
 					capture(mc);

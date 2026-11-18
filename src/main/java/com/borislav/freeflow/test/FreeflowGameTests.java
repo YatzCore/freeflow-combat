@@ -1310,6 +1310,45 @@ public class FreeflowGameTests implements FabricGameTest {
 		h.succeed();
 	}
 
+	@GameTest(template = EMPTY_STRUCTURE)
+	public void waitingEnemiesAreSentInOneAtATime(GameTestHelper h) {
+		ServerPlayer p = player(h, CombatMode.FORCED_ON);
+		CombatState state = CombatStateManager.get(p);
+		List<Zombie> zombies = new java.util.ArrayList<>();
+		for (int i = 0; i < 6; i++) {
+			zombies.add(zombie(h, 2.5 + 5 * Math.cos(i), 2.5 + 5 * Math.sin(i)));
+		}
+		int sentIn = 0;
+		for (Zombie z : zombies) {
+			if (!com.borislav.freeflow.ai.CombatDirector.shouldWait(p, z)) {
+				sentIn++;
+			}
+		}
+		h.assertTrue(sentIn == 1, "only one enemy leaves the ring at a time (" + sentIn + ")");
+		Zombie first = zombies.stream().filter(z -> !com.borislav.freeflow.ai.CombatDirector.shouldWait(p, z)).findFirst().orElseThrow();
+		h.assertTrue(!com.borislav.freeflow.ai.CombatDirector.shouldWait(p, first), "the one sent in keeps going");
+
+		// Fill the attacker cap: nobody else may come in, even after the gap.
+		state.lastApproachGrant = -1000;
+		long now = h.getLevel().getGameTime();
+		int n = 0;
+		for (Zombie z : zombies) {
+			com.borislav.freeflow.ai.EnemySlot slot = com.borislav.freeflow.ai.CombatDirector.slot(state, z);
+			if (n++ < com.borislav.freeflow.config.FreeflowConfig.maxSimultaneousAttackers) {
+				slot.approachUntil = now + 100;
+			}
+		}
+		Zombie last = zombies.get(zombies.size() - 1);
+		h.assertTrue(com.borislav.freeflow.ai.CombatDirector.shouldWait(p, last), "the rest wait while the attacker cap is full");
+
+		// A stunned enemy never comes in.
+		state.enemies.clear();
+		state.lastApproachGrant = -1000;
+		EnemyStatus.stun(p, state, last, 40);
+		h.assertTrue(com.borislav.freeflow.ai.CombatDirector.shouldWait(p, last), "a stunned enemy stays out");
+		h.succeed();
+	}
+
 	// ------------------------------------------------------------------ combat challenge arena
 
 	@GameTest(template = EMPTY_STRUCTURE)

@@ -366,6 +366,7 @@ public final class Arena {
 				}
 				int alive = aliveEnemies();
 				if (alive == 0) {
+					player.connection.send(new ClientboundSetActionBarTextPacket(Component.empty()));
 					sweepDrops();
 					wave++;
 					if (mode == Mode.CLASSIC && wave >= Waves.ALL.size()) {
