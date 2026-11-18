@@ -36,6 +36,11 @@ public final class FreeflowConfig {
 			tip = "Caps the fight-rating bonus (stops long fights against big mobs from farming XP on servers).")
 	public static int fightXpCap = 30;
 
+	@Setting(category = GENERAL, name = "Arena for everyone",
+			tip = "Let every player use /freeflow arena on a server (otherwise operators only; "
+					+ "in singleplayer the world's owner can always use it).")
+	public static boolean arenaForEveryone = false;
+
 	/** How often (ticks) the server rescans for engaged mobs. */
 	public static int combatScanInterval = 4;
 

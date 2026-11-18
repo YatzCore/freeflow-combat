@@ -118,6 +118,7 @@ public final class AnimationPreview {
 	}
 
 	private static void buildScript(Minecraft mc) {
+		mc.options.pauseOnLostFocus = false; // the preview window is usually in the background
 		if ("1".equals(System.getenv("FREEFLOW_PREVIEW_SETTINGS"))) {
 			// Settings screen: one screenshot per tab, then quit.
 			for (com.borislav.freeflow.config.Setting.Category tab : com.borislav.freeflow.config.Setting.Category.values()) {
@@ -129,6 +130,10 @@ public final class AnimationPreview {
 				then(1, () -> endSheet(mc));
 			}
 			then(5, () -> mc.stop());
+			return;
+		}
+		if ("1".equals(System.getenv("FREEFLOW_PREVIEW_ARENA"))) {
+			arenaRun(mc);
 			return;
 		}
 		if ("1".equals(System.getenv("FREEFLOW_PREVIEW_MP"))) {
@@ -415,6 +420,70 @@ public final class AnimationPreview {
 				fought[0], maxCombo[0], ClientCombatState.sentInputs, ClientCombatState.acceptedInputs));
 		then(5, () -> remote(mc, "kill @e[type=minecraft:zombie]"));
 		then(10, () -> mc.stop());
+	}
+
+	/** Starts the combat challenge, photographs it, auto-fights for a while (logging waves), stops it. */
+	private static void arenaRun(Minecraft mc) {
+		FreeflowMod.LOGGER.info("[preview] arena run");
+		Vec3[] center = new Vec3[1];
+		then(5, () -> command(mc, "gamemode survival @p"));
+		then(5, () -> command(mc, "effect give @p minecraft:resistance 120 4 true"));
+		then(30, () -> {
+			command(mc, "freeflow arena start");
+		});
+		then(20, () -> {
+			center[0] = mc.player.position();
+			FreeflowMod.LOGGER.info("[preview] arena inventory at start: {}", inventory(mc));
+			FreeflowMod.LOGGER.info("[preview] arena player at {}", center[0]);
+			mc.options.hideGui = false;
+			lookAt(center[0].add(0, 16, 15), center[0]);
+			beginSheet("arena_overview");
+			capture(mc);
+			endSheet(mc);
+			cameraPos = null;
+		});
+		then(70, () -> { }); // countdown + enemies arriving
+		then(1, () -> {
+			lookAt(center[0].add(9, 7, 9), center[0]);
+			beginSheet("arena_wave1");
+			capture(mc);
+			endSheet(mc);
+			cameraPos = null;
+		});
+		int[] lastWave = {-1};
+		for (int t = 0; t < 2400; t += 4) {
+			int tick = t;
+			then(4, () -> {
+				if (ClientCombatState.isFreeflowActive()) {
+					com.borislav.freeflow.client.ClientInputHandler.padAction(
+							tick % 12 == 0 ? com.borislav.freeflow.combat.CombatAction.COUNTER
+									: tick % 20 == 2 ? com.borislav.freeflow.combat.CombatAction.STUN
+									: com.borislav.freeflow.combat.CombatAction.STRIKE);
+				}
+				if (tick % 100 == 0) {
+					FreeflowMod.LOGGER.info("[preview] arena t={} freeflow={} combo={} health={} enemiesNear={}", tick,
+							ClientCombatState.isFreeflowActive(), com.borislav.freeflow.client.ClientCombo.combo,
+							mc.player.getHealth(), mc.level.getEntitiesOfClass(net.minecraft.world.entity.monster.Monster.class,
+									mc.player.getBoundingBox().inflate(16)).size());
+				}
+				if (tick == 600) {
+					lookAt(center[0].add(-9, 7, 9), center[0]);
+					beginSheet("arena_later");
+					capture(mc);
+					endSheet(mc);
+					cameraPos = null;
+				}
+			});
+		}
+		then(5, () -> command(mc, "freeflow arena stop"));
+		then(20, () -> FreeflowMod.LOGGER.info("[preview] arena stopped, player back at {}, inventory: {}",
+				mc.player.position(), inventory(mc)));
+		then(10, () -> mc.stop());
+	}
+
+	private static String inventory(Minecraft mc) {
+		return mc.player.getInventory().items.stream().filter(st -> !st.isEmpty())
+				.map(st -> st.getCount() + "x " + st.getItem()).toList().toString();
 	}
 
 	private static void remote(Minecraft mc, String cmd) {

@@ -25,6 +25,8 @@ public class FreeflowMod implements ModInitializer {
 		LOGGER.info("Freeflow Combat initializing");
 		FreeflowNetworking.registerPayloads();
 		ConfigSync.init();
+		FreeflowCommands.init();
+		com.borislav.freeflow.arena.Arena.init();
 		CombatStateManager.init();
 	}
 }

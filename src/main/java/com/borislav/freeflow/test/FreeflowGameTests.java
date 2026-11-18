@@ -12,6 +12,8 @@ import com.borislav.freeflow.combat.CombatModeTracker;
 import com.borislav.freeflow.combat.CombatState;
 import com.borislav.freeflow.combat.CombatStateManager;
 import com.borislav.freeflow.combat.RunBoost;
+import com.borislav.freeflow.arena.Arena;
+import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import com.borislav.freeflow.config.ConfigStore;
 import com.borislav.freeflow.input.PadLogic;
@@ -1305,6 +1307,55 @@ public class FreeflowGameTests implements FabricGameTest {
 		CombatStateManager.handleInput(b, new CombatInputPayload(CombatAction.GROUND_TAKEDOWN, 0, 0, FACING_PLUS_Z));
 		h.assertTrue(CombatStateManager.get(b).takedownTarget == z,
 				"the second player can ground-takedown an enemy the first one knocked down");
+		h.succeed();
+	}
+
+	// ------------------------------------------------------------------ combat challenge arena
+
+	@GameTest(template = EMPTY_STRUCTURE)
+	public void arenaBuildsAboveAndCleansUp(GameTestHelper h) {
+		ServerPlayer p = player(h, CombatMode.AUTO);
+		Vec3 start = p.position();
+		try {
+			h.assertTrue(Arena.start(p, true) == null, "the arena starts");
+			BlockPos c = Arena.centerOf(p);
+			h.assertTrue(c != null && c.getY() > start.y + 19, "the arena is built in the sky above the player");
+			h.assertTrue(!h.getLevel().getBlockState(c).isAir(), "it has a floor");
+			h.assertTrue(!h.getLevel().getBlockState(c.offset(Arena.RADIUS + 1, 2, 0)).isAir(), "and a wall");
+			h.assertTrue(Math.abs(p.getY() - (c.getY() + 1)) < 0.01, "the player is put on the arena floor");
+			h.assertTrue(Arena.start(p, true) != null, "a second arena can't be started at the same time");
+
+			h.assertTrue(Arena.stop(p), "stop ends it");
+			h.assertTrue(h.getLevel().getBlockState(c).isAir() && h.getLevel().getBlockState(c.offset(Arena.RADIUS + 1, 2, 0)).isAir(),
+					"every arena block is removed");
+			h.assertTrue(p.position().distanceTo(start) < 0.01, "the player goes back where they were");
+		} finally {
+			Arena.stop(p);
+		}
+		h.succeed();
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE)
+	public void arenaDefeatDoesNotKill(GameTestHelper h) {
+		ServerPlayer p = player(h, CombatMode.AUTO);
+		try {
+			h.assertTrue(Arena.start(p, true) == null, "the arena starts");
+			p.invulnerableTime = 0;
+			p.hurt(h.getLevel().damageSources().generic(), 1000f);
+			h.assertTrue(p.isAlive() && p.getHealth() == p.getMaxHealth(), "a knockout in the arena ends the challenge, not your life");
+		} finally {
+			Arena.stop(p);
+		}
+		h.succeed();
+	}
+
+	@GameTest(template = EMPTY_STRUCTURE)
+	public void arenaRefusesPeaceful(GameTestHelper h) {
+		ServerPlayer p = player(h, CombatMode.AUTO);
+		if (h.getLevel().getDifficulty() == net.minecraft.world.Difficulty.PEACEFUL) {
+			h.assertTrue(Arena.start(p) != null && !Arena.isActive(p), "no arena on Peaceful (enemies would vanish)");
+		}
+		Arena.stop(p);
 		h.succeed();
 	}
 }

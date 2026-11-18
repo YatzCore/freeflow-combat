@@ -44,6 +44,14 @@ enemies, shooters): roll away.
 All keys can be rebound in Options > Controls. Outside fights the controller plays Minecraft:
 ✕ jump, L3 sprint, ○ sneak, R2/□ attack, L2 use, △ inventory, L1/R1 hotbar, D-pad ↓ drop.
 
+## Combat challenge
+
+`/freeflow arena start` builds an arena in the sky and sends four waves at you: thugs, then
+shields, then armed fighters and shooters, then everything at once with a ravager. Getting
+knocked out ends the run instead of killing you, and when it ends you go back to where you
+started and the arena is removed. `/freeflow arena stop` ends it early. Available to operators
+and singleplayer owners (a server setting can open it to everyone).
+
 ## Settings
 
 Press **K** (or use Mod Menu). Every timing, range, damage value, enemy role list, camera
